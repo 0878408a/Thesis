@@ -1,0 +1,43 @@
+[package]
+name = "firmware_module"
+# name: 定義這個 Move 套件的名稱
+# 在 Move 模組中完整名稱會變成 firmware_notify::firmware_module::YourFunctionName
+#（以 [addresses] 中定義的 firmware_notify 為命名空間）。
+
+edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
+# edition: Move 語言的版本
+# license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
+authors = ["ray"]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
+
+[dependencies]
+Iota = { git = "https://github.com/iotaledger/iota.git", subdir = "crates/iota-framework/packages/iota-framework", rev = "testnet" }
+
+# For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
+# Revision can be a branch, a tag, and a commit hash.
+# MyRemotePackage = { git = "https://some.remote/host.git", subdir = "remote/path", rev = "main" }
+
+# For local dependencies use `local = path`. Path is relative to the package root
+# Local = { local = "../path/to" }
+
+# To resolve a version conflict and force a specific version for dependency
+# override use `override = true`
+# Override = { local = "../conflicting/version", override = true }
+
+[addresses]
+firmware_notify = "0x0" 
+# IOTA Rebased 上的模組必須使用 0x0 作為預設地址，只有在 address 0x0 下的模組才能部署到鏈上作為 package 模組，其餘地址會被視為不合法。
+
+# Named addresses will be accessible in Move as `@name`. They're also exported:
+# for example, `std = "0x1"` is exported by the Standard Library.
+# alice = "0xA11CE"
+
+[dev-dependencies]
+# The dev-dependencies section allows overriding dependencies for `--test` and
+# `--dev` modes. You can introduce test-only dependencies here.
+# Local = { local = "../path/to/dev-build" }
+
+[dev-addresses]
+# The dev-addresses section allows overwriting named addresses for the `--test`
+# and `--dev` modes.
+# alice = "0xB0B"
+
