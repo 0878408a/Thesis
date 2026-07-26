@@ -30,7 +30,7 @@ private_key = load_pem_private_key(MANUFACTURER_PRIVATE_KEY_PATH.read_bytes(), p
 # Django API 的 URL（請依實際路徑調整）
 url = "https://localhost:8000/upload_firmware/upload/"
 
-# 註冊 ngrok 指令: curl -X POST "https://api.telegram.org/botREMOVED/setWebhook?url=https://2db6-2001-b400-e75d-7c78-8170-b4c3-9ec3-c63.ngrok-free.app/webhook"
+# 註冊 ngrok 指令: curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=<NGROK_HTTPS_URL>/webhook"
 
 
 # 建立測試資料
