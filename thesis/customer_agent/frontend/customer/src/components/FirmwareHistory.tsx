@@ -46,17 +46,22 @@ function Field({
   children,
   valueTestId,
   valueClassName,
+  wrapperClassName,
 }: {
   label: string
   children: ReactNode
   valueTestId?: string
   valueClassName?: string
+  wrapperClassName?: string
 }) {
   const ddClass = valueClassName
     ? `fw-field-value ${valueClassName}`
     : 'fw-field-value'
+  const divClass = wrapperClassName
+    ? `fw-field ${wrapperClassName}`
+    : 'fw-field'
   return (
-    <div className="fw-field">
+    <div className={divClass}>
       <dt className="fw-field-label">{label}</dt>
       <dd className={ddClass} data-testid={valueTestId}>
         {children}
@@ -155,6 +160,7 @@ export function FirmwareHistory({
                     label="Object ID"
                     valueTestId="firmware-object-id"
                     valueClassName="fw-long-string"
+                    wrapperClassName="fw-field-object-id"
                   >
                   <span className="fw-long-string">{firmware.object_id}</span>
                 </Field>

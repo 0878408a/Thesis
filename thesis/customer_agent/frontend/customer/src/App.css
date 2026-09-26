@@ -70,6 +70,13 @@ body {
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel h2 {
+  text-align: center;
+  margin: 0 0 14px;
 }
 
 /* Dashboard 2×2 grid layout.
@@ -149,10 +156,13 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
+  text-align: center;
   gap: 8px;
   min-width: 0;
   padding: 20px;
   overflow: hidden;
+  flex: 1;
 }
 
 /* Firmware History card header: title left, refresh controls right, same row.
@@ -166,6 +176,7 @@ body {
   min-width: 0;
   max-width: 100%;
   flex-wrap: wrap;
+  margin-bottom: 14px;
 }
 
 .fw-history-header h2 {
@@ -174,6 +185,8 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
+  text-align: left;
+  flex: 1;
 }
 
 /* Toolbar slot wraps the refresh-controls node so hint + button stay side-by-side,
@@ -219,112 +232,71 @@ body {
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
+  flex: 1;
 }
 
 table {
-  width: 100%;
   border-collapse: collapse;
-  /* 700px：確保 5 欄（Update Status）table-layout:fixed 下欄寬分配合理；
-     Mobile（≤640px）由 .table-wrapper 的 overflow-x:auto 水平捲動保護。 */
-  table-layout: fixed;
 }
 
 th,
 td {
-  text-align: left;
-  padding: 14px 12px;
+  text-align: center;
+  padding: 10px 16px;
   border-bottom: 1px solid #e2e8f0;
   color: #334155;
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
-/* 兩張 table（Devices / Update Status）共用同一套表頭規則：
-   0.8rem 字級 + line-height 1.2 讓長標題自然換行，欄間不黏連；
-   允許正常換行（white-space:normal），不強制單行。 */
 th {
   font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.2;
-  white-space: normal;
-  overflow-wrap: break-word;
+  white-space: nowrap;
+  text-align: center;
+  padding: 10px 16px;
 }
 
-/* Devices table */
-.data-table.devices-table {
-  table-layout: fixed;
-}
-
-/* Update Status table */
-.data-table.update-status-table {
-  table-layout: fixed;
-}
-
+/* 兩張 data table（Devices / Update Status）：
+   不自動換行（white-space: nowrap），
+   內容超寬時由 .table-wrapper overflow-x:auto 水平捲動，
+   卡片尺寸維持不變，不隨內容撐開。
+   table 置中對齊，卡片內多餘空間分佈在兩側。 */
 .data-table {
-  width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  white-space: nowrap;
+  margin: 0 auto;
 }
 
 .data-table th,
 .data-table td {
-  text-align: left;
+  text-align: center;
   vertical-align: middle;
-  padding: 14px 12px;
+  padding: 10px 16px;
   border-bottom: 1px solid #e2e8f0;
   color: #334155;
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
-/* Devices:
-   Device Type | Manufacturer | Current Firmware | Update Method */
-.devices-table th:nth-child(1),
-.devices-table td:nth-child(1) {
-  width: 20%;
-}
+/* Devices 欄位 min-width：確保 nowrap 下各欄有足夠空間，不黏連 */
+.data-table:not(.update-status-table) th:nth-child(1),
+.data-table:not(.update-status-table) td:nth-child(1) { min-width: 120px; }
+.data-table:not(.update-status-table) th:nth-child(2),
+.data-table:not(.update-status-table) td:nth-child(2) { min-width: 140px; }
+.data-table:not(.update-status-table) th:nth-child(3),
+.data-table:not(.update-status-table) td:nth-child(3) { min-width: 160px; }
+.data-table:not(.update-status-table) th:nth-child(4),
+.data-table:not(.update-status-table) td:nth-child(4) { min-width: 120px; }
 
-.devices-table th:nth-child(2),
-.devices-table td:nth-child(2) {
-  width: 25%;
-}
-
-.devices-table th:nth-child(3),
-.devices-table td:nth-child(3) {
-  width: 30%;
-}
-
-.devices-table th:nth-child(4),
-.devices-table td:nth-child(4) {
-  width: 25%;
-}
-
-/* Update Status:
-   Device Type | Current | Latest | Known Versions | Non-Current */
+/* Update Status 欄位 min-width */
 .update-status-table th:nth-child(1),
-.update-status-table td:nth-child(1) {
-  width: 24%;
-}
-
+.update-status-table td:nth-child(1) { min-width: 120px; }
 .update-status-table th:nth-child(2),
-.update-status-table td:nth-child(2) {
-  width: 18%;
-}
-
+.update-status-table td:nth-child(2) { min-width: 140px; }
 .update-status-table th:nth-child(3),
-.update-status-table td:nth-child(3) {
-  width: 18%;
-}
-
+.update-status-table td:nth-child(3) { min-width: 140px; }
 .update-status-table th:nth-child(4),
-.update-status-table td:nth-child(4) {
-  width: 20%;
-}
-
+.update-status-table td:nth-child(4) { min-width: 110px; }
 .update-status-table th:nth-child(5),
-.update-status-table td:nth-child(5) {
-  width: 20%;
-}
+.update-status-table td:nth-child(5) { min-width: 110px; }
 
 td:last-child a {
   overflow-wrap: anywhere;
@@ -484,8 +456,30 @@ td:last-child a {
   word-break: break-word;
 }
 
+/* Object ID 欄：固定寬度容器，超出時出現水平捲軸，卡片尺寸不受影響 */
+.fw-field-object-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.fw-field-object-id .fw-field-value {
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  flex: 1;
+  min-height: 0;
+}
+
 /* Long string (object_id) — guaranteed to wrap without spaces,
-   so a 66-char hex value never forces horizontal overflow. */
+   so a 66-char hex value never forces horizontal overflow.
+   在 .fw-field-object-id 內被覆蓋為 nowrap + 水平捲軸。 */
 .fw-long-string {
   overflow-wrap: anywhere;
   word-break: break-word;
