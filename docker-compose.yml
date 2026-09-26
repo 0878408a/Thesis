@@ -1,0 +1,195 @@
+# ============================================================================
+# Thesis 整合型 Docker Compose (單一 Nginx 對外入口)
+#
+# 對外只暴露 Nginx:
+#   - :443   Customer 端 (Browser)  static + /api → customer-agent
+#   - :8443  Manufacturer 端 (mTLS) /manufacturer/client → manufacturer-client
+#                                  /manufacturer/agent  → manufacturer-agent
+#
+# 上游 service 不直接對 host 暴露 port; 一律只綁 thesis container network。
+# 憑證 / .env 一律 volume 掛入, 不 bake 進 image。
+#
+# 使用:
+#   docker compose up -d --build
+#   customer 端  https://localhost:443/
+#   manufacturer 端 (mTLS, 8443) 需憑證 + ca 才能連 (見 nginx/certs/ 掛入)
+# ============================================================================
+
+services:
+  # ------------------------------------------------------------------
+  # Customer Agent (Flask) — public :5001 / mTLS device :5000
+  #   讀 DB: pymysql (DB_HOST/PORT/USER/PASSWORD/NAME, dotenv .env 或 env)
+  # ------------------------------------------------------------------
+  customer-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.customer-agent
+    image: thesis/customer-agent
+    container_name: thesis-customer-agent
+    environment:
+      CUSTOMER_AGENT_PUBLIC_PORT: "5001"
+      CUSTOMER_AGENT_DEVICE_PORT: "5000"
+      CUSTOMER_AGENT_ENABLE_MDNS: "0"
+      CUSTOMER_AGENT_ENABLE_PERIODIC_QUERY: "1"
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ap365084
+      DB_NAME: customer_database
+      CERT_DIR: /certs
+    volumes:
+      # 學術用 git-tracked dev 憑證 (扁平掛至 /certs, 對照 config.py CERT_DIR override:
+      #   CUSTOMER_KEY_PATH=$CERT_DIR/ecdsa_customer_private_key.pem 等)
+      - ./thesis/customer_agent/ecdsa_customer_private_key.pem:/certs/ecdsa_customer_private_key.pem:ro
+      - ./thesis/customer_agent/ecdsa_customer_public_cert.pem:/certs/ecdsa_customer_public_cert.pem:ro
+      - ./thesis/customer_agent/ecdsa_manufacturer_agent_public_cert.pem:/certs/ecdsa_manufacturer_agent_public_cert.pem:ro
+      - ./thesis/ca/certs/ecdsa_ca.pem:/certs/ecdsa_ca.pem:ro
+      - ./thesis/ca/certs/ecdsa_manufacturer_ca_cert.pem:/certs/ecdsa_manufacturer_ca_cert.pem:ro
+      # DB 密碼等 .env 由 host 掛入 (不 bake 進 image)
+      - ./thesis/customer_agent/.env:/app/customer_agent/.env:ro
+    depends_on:
+      - mariadb
+    networks:
+      - thesis
+    ports:
+      - "5001:5001"
+    # 不對 host 暴露; 僅 Nginx 經 container network 存取 :5001
+
+  # ------------------------------------------------------------------
+  # Manufacturer Agent (Django) — :8000 (mTLS 由 Nginx 終止)
+  #   IOTA 上鏈經 `npx tsx submit_firmware.ts` (需 node + npm 套件)
+  # ------------------------------------------------------------------
+  manufacturer-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.manufacturer-agent
+    image: thesis/manufacturer-agent
+    container_name: thesis-manufacturer-agent
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ap365084
+      DB_NAME: mydatabase
+      DJANGO_ALLOWED_HOSTS: "manufacturer-agent"
+      DJANGO_SECRET_KEY: "django-insecure-sz-1t24bvxud#ya78p#hng)=!upehnuhblq*^vnjsb4ibr5iet"
+      DJANGO_DEBUG: "True"
+      # IOTA 上鏈環境變數 (與 thesis/manufacturer_agent/.env 一致; submit_firmware.ts 由 dotenv 讀 .env,
+      # 但 npx tsx 在 image 內執行時 process.cwd() 不在該目錄, 故以 compose env 明確注入):
+      IOTA_NETWORK: "testnet"
+      IOTA_PRIVATE_KEY_BASE64: "AW8+XT3NFjeh91PMrRg0N0JZdLkc3BaF8rWMO0s6Uvfz"
+      PACKAGE_ID: "0x08e70252b9d1ecd72456899d02450fd2f76cba1993b6d291d7c7094681a96933"
+      MOVE_MODULE: "firmware_module"
+      MOVE_FUNCTION: "publish"
+      CERT_DIR: /certs
+    volumes:
+      # 學術用 git-tracked dev 憑證 (扁平掛至 /certs):
+      #   shared/config.py CERT_DIR override →
+      #   CA_CERT_PATH=$CERT_DIR/ecdsa_ca.pem
+      #   MANUFACTURER_AGENT_CERT/KEY=$CERT_DIR/ecdsa_manufacturer_agent_*.pem
+      - ./thesis/ca/certs/ecdsa_ca.pem:/certs/ecdsa_ca.pem:ro
+      - ./thesis/manufacturer_agent/ecdsa_manufacturer_agent_public_cert.pem:/certs/ecdsa_manufacturer_agent_public_cert.pem:ro
+      # ManufacturerUploadRespond() 對每個回應(成功/錯誤)都需讀取
+      # MANUFACTURER_AGENT_PRIVATE_KEY_PATH 簽章回應; 缺少此掛載會導致 500。
+      # 此金鑰為學術用 git-tracked dev 憑證, 與 manufacturer-client 掛自己的金鑰一致。
+      - ./thesis/manufacturer_agent/ecdsa_manufacturer_agent_private_key.pem:/certs/ecdsa_manufacturer_agent_private_key.pem:ro
+      - ./thesis/manufacturer_agent/.env:/app/manufacturer_agent/.env:ro
+      # Django 專案需可讀 (settings / urls / 各 app)
+      - ./thesis/manufacturer_agent:/app/manufacturer_agent:ro
+    depends_on:
+      - mariadb
+    networks:
+      - thesis
+    # 不對 host 暴露; 僅 Nginx 經 container network 存取 :8000
+
+  # ------------------------------------------------------------------
+  # Manufacturer Client (Flask internal :5002) — 上層 API 轉發層
+  #   Nginx 8443 → 本 service → mTLS → Manufacturer Agent :8000
+  #   注意: 與 customer-agent 的 :5001 分屬不同 container, 不衝突
+  # ------------------------------------------------------------------
+  manufacturer-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.manufacturer-client
+    image: thesis/manufacturer-client
+    container_name: thesis-manufacturer-client
+    ports:
+      - "5002:5002"
+    environment:
+      # 透過 Nginx mTLS 8443 指回 Manufacturer Agent 的 upload / history 端點
+      UPLOAD_URL: "https://nginx:8443/manufacturer/agent/upload_firmware/upload/"
+      HISTORY_URL: "https://nginx:8443/manufacturer/agent/upload_firmware/history/"
+      CERT_DIR: /certs
+    volumes:
+      # 學術用 git-tracked dev 憑證 (扁平掛至 /certs):
+      #   shared/config.py CERT_DIR override →
+      #   MANUFACTURER_PRIVATE_KEY_PATH=$CERT_DIR/ecdsa_manufacturer_private_key.pem
+      #   MANUFACTURER_CERT_PATH=$CERT_DIR/ecdsa_manufacturer_client_cert.pem
+      #   CA_CERT_PATH=$CERT_DIR/ecdsa_ca.pem
+      - ./thesis/ca/certs/ecdsa_ca.pem:/certs/ecdsa_ca.pem:ro
+      - ./thesis/manufacturer_client/ecdsa_manufacturer_client_cert.pem:/certs/ecdsa_manufacturer_client_cert.pem:ro
+      - ./thesis/manufacturer_client/ecdsa_manufacturer_private_key.pem:/certs/ecdsa_manufacturer_private_key.pem:ro
+    depends_on:
+      - manufacturer-agent
+    networks:
+      - thesis
+    # 不對 host 暴露; 僅 Nginx 經 container network 存取 :5002
+
+  # ------------------------------------------------------------------
+  # 整合 Nginx 單一對外入口 (443 + 8443)
+  #   static:   掛已 build 出的 customer frontend dist/
+  #   /api/:    → customer-agent:5001 (TLS)
+  #   mTLS:     /manufacturer/... → manufacturer-client / manufacturer-agent
+  # ------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: thesis-nginx
+    depends_on:
+      - customer-agent
+      - manufacturer-agent
+      - manufacturer-client
+    ports:
+      - "443:443"
+      - "8443:8443"
+    volumes:
+      # 整合型 nginx.conf (對外入口設定; server blocks 拆至 conf.d/)
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # customer frontend 靜態 dist/ (先 npm run build 產出; 這裡 host 掛入)
+      - ./thesis/customer_agent/frontend/customer/dist:/usr/share/nginx/html:ro
+      # manufacturer frontend 靜態 dist/ (先 npm run build 產出; 這裡 host 掛入)
+      - ./thesis/manufacturer_client/frontend/manufacturer/dist:/usr/share/nginx/manufacturer-html:ro
+      # Nginx ssl_certificate / client_ca / CA
+      #   檔名見 conf.d/manufacturer.conf; 由 bash nginx/certs/assemble_certs.sh 匯整出 alias/
+      - ./nginx/certs/alias:/etc/nginx/certs:ro
+    networks:
+      - thesis
+
+  # ------------------------------------------------------------------
+  # MariaDB — 單一實例, 兩個 schema:
+  #   customer_database (customer agent)  +  mydatabase (manufacturer agent)
+  # 學術 demo 用; 正式環境可移除本 service 改指既有 DB (DB_HOST=host)
+  # ------------------------------------------------------------------
+  mariadb:
+    image: mariadb:11
+    container_name: thesis-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: ap365084
+      MYSQL_DATABASE: mydatabase
+    command:
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+      - mariadb_data:/var/lib/mysql
+    tmpfs:
+      - /run/mysqld
+    networks:
+      - thesis
+    # 不對 host 暴露 (僅 container network); 學術 demo 如需外部 DB 可自加 ports
+
+volumes:
+  mariadb_data:
+
+networks:
+  thesis:
+    driver: bridge
