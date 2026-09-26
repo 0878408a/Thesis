@@ -1,0 +1,436 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f3f6fb;
+}
+
+.dashboard-shell {
+  min-height: 100vh;
+  background: #f3f6fb;
+  padding: 32px 24px 40px;
+}
+
+/*
+ * Header 和下面的 content
+ * 都使用同一個 max-width，
+ * 因此左、右邊界會完全對齊。
+ */
+.topbar,
+.content {
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.topbar {
+  margin-bottom: 24px;
+}
+
+.eyebrow { 
+  margin: 0 0 8px; 
+  text-align: center; 
+  font-size: 12px; 
+  text-transform: uppercase; 
+  letter-spacing: 0.12em; 
+  color: #5b6b7a; 
+}
+
+.topbar h1 {
+  margin: 0;
+  text-align: center;
+  /* clamp: 320px → ~1.5rem, 768px → ~2rem, 1200px+ → 2.2rem */
+  font-size: clamp(1.5rem, 2.5vw + 0.9rem, 2.2rem);
+  line-height: 1.2;
+  color: #0f172a;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.content {
+  display: grid;
+  gap: 20px;
+}
+
+.panel {
+  width: 100%;
+  /* 避免內容 intrinsic size 撐開 grid 欄位造成頁面水平溢出 */
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+.panel-header { 
+  margin-bottom: 18px; 
+  text-align: center; 
+} 
+
+.panel-header h2 { 
+  margin: 0; 
+  font-size: 1.35rem; 
+  color: #111827; 
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.2);
+  border-color: #2563eb;
+}
+
+.table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  /* Desktop default min-width; @media overrides shrink it further */
+  min-width: 640px;
+  table-layout: fixed;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/*
+ * Object ID 是很長且沒有空格的字串，
+ * 必須允許它換行，避免把整個 table 撐寬。
+ */
+th:last-child,
+td:last-child {
+  width: 220px;
+  max-width: 220px;
+}
+
+td:last-child a {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+
+.upload-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.file-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.file-picker input {
+  width: 100%;
+  padding: 12px 10px;
+  border: 1px dashed #94a3b8;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.file-summary {
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.primary-button {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+  opacity: 0.96;
+}
+
+.primary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.status-row p {
+  margin: 0;
+  color: #475569;
+}
+
+.status-badge,
+.table-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.status-badge.ready,
+.table-status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.uploading,
+.table-status.uploaded {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-badge.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.error,
+.table-status.failed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.error-text {
+  color: #b91c1c;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* ============================================
+   Responsive breakpoints
+   ============================================ */
+
+/* Large desktop ≥ 1201px: default layout, nothing to override */
+
+/* Tablet / small laptop 701–1200px */
+@media (max-width: 1200px) {
+  .dashboard-shell {
+    padding: 28px 20px 36px;
+  }
+}
+
+/* Small tablet / large phone ≤ 700px */
+@media (max-width: 700px) {
+  .dashboard-shell {
+    padding: 20px 16px 30px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  .panel-header h2 {
+    font-size: 1.15rem;
+  }
+
+  .field input,
+  .field select {
+    height: 40px;
+    font-size: 0.95rem;
+  }
+
+  .primary-button {
+    width: 100%;
+  }
+
+  /* table: keep min-width but shrink cell padding */
+  th,
+  td {
+    padding: 10px 8px;
+  }
+
+  th {
+    font-size: 0.72rem;
+  }
+
+  th:last-child,
+  td:last-child {
+    width: 160px;
+    max-width: 160px;
+  }
+}
+
+/* Phone ≤ 480px */
+@media (max-width: 480px) {
+  .dashboard-shell {
+    padding: 16px 12px 24px;
+  }
+
+  .topbar {
+    margin-bottom: 16px;
+  }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .panel {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .panel-header {
+    margin-bottom: 12px;
+  }
+
+  .panel-header h2 {
+    font-size: 1.05rem;
+  }
+
+  .form-grid {
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .field input,
+  .field select {
+    height: 38px;
+    padding: 0 10px;
+    font-size: 0.9rem;
+  }
+
+  .upload-box {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .file-picker input {
+    padding: 8px;
+    font-size: 0.9rem;
+  }
+
+  .file-summary {
+    font-size: 0.85rem;
+  }
+
+  .primary-button {
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
+  .status-row {
+    gap: 8px;
+  }
+
+  .status-row p {
+    font-size: 0.9rem;
+  }
+
+  /* table further shrunk */
+  th,
+  td {
+    padding: 8px 6px;
+  }
+
+  th {
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+  }
+
+  th:last-child,
+  td:last-child {
+    width: 120px;
+    max-width: 120px;
+  }
+}
+
