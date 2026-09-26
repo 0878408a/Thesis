@@ -1,0 +1,539 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f3f6fb;
+}
+
+.dashboard-shell {
+  min-height: 100vh;
+  background: #f3f6fb;
+  padding: 32px 24px 40px;
+}
+
+.topbar,
+.content {
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.topbar {
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #5b6b7a;
+}
+
+.topbar h1 {
+  margin: 0;
+  text-align: center;
+  /* clamp: 320px → ~1.5rem, 768px → ~2rem, 1200px+ → 2.2rem (desktop original) */
+  font-size: clamp(1.5rem, 2.5vw + 0.9rem, 2.2rem);
+  line-height: 1.2;
+  color: #0f172a;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.content {
+  display: grid;
+  gap: 20px;
+}
+
+.panel {
+  width: 100%;
+  /* 讓 grid item 可縮小至內容的 min-width 以下；
+     避免 table min-width:700px 沿 intrinsic size 向上传播、
+     撐開 grid 欄位造成整個頁面水平溢出。
+     實際水平捲動由 .table-wrapper (overflow-x:auto) 負責。 */
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+/* Dashboard 2×2 grid layout.
+   Desktop: 2 columns × 2 rows — Devices | Known Firmware / Update Status | (Firmware History spans full width below)
+   Mobile (≤640px): single column, all four regions stacked vertically.
+   align-items: stretch 讓同一 row 的卡片高度對齊；
+   各卡片內部以 flex column 填滿，避免高度不對稱。 */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Stat cards 與 panel 卡片填滿 grid row 高度 */
+.dashboard-grid .overview-card,
+.dashboard-grid .panel {
+  height: 100%;
+}
+
+/* Firmware History spans the full width of the grid on both desktop and mobile. */
+.fw-history {
+  grid-column: 1 / -1;
+}
+
+/* Firmware refresh controls — rendered inline inside the Firmware History card header.
+   No absolute positioning, no z-index, no negative margins.
+   flex: 1 1 0 lets it fill available width in the header row without forcing overflow. */
+.dashboard-refresh-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.dashboard-refresh-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #94a3b8;
+  /* allow wrapping when space is tight — never force nowrap + ellipsis */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.dashboard-refresh-error {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #b91c1c;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.dashboard-refresh-button {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dashboard-refresh-button:hover {
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* Stat cards — Devices / Known Firmware (first row of the 2×2 grid) */
+.overview-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 20px;
+  overflow: hidden;
+}
+
+/* Firmware History card header: title left, refresh controls right, same row.
+   flex-wrap: wrap allows the toolbar to drop below the title on very narrow
+   screens without causing horizontal overflow. */
+.fw-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.fw-history-header h2 {
+  margin: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Toolbar slot wraps the refresh-controls node so hint + button stay side-by-side,
+   filling the remaining header width. flex-shrink: 0 keeps the button visible,
+   while the hint text wraps internally when space is tight. */
+.fw-history-toolbar-slot {
+  min-width: 0;
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.overview-label {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.overview-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.panel-header {
+  margin-bottom: 18px;
+  text-align: center;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #111827;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  /* 700px：確保 5 欄（Update Status）table-layout:fixed 下欄寬分配合理；
+     Mobile（≤640px）由 .table-wrapper 的 overflow-x:auto 水平捲動保護。 */
+  table-layout: fixed;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 兩張 table（Devices / Update Status）共用同一套表頭規則：
+   0.8rem 字級 + line-height 1.2 讓長標題自然換行，欄間不黏連；
+   允許正常換行（white-space:normal），不強制單行。 */
+th {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Devices table */
+.data-table.devices-table {
+  table-layout: fixed;
+}
+
+/* Update Status table */
+.data-table.update-status-table {
+  table-layout: fixed;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  vertical-align: middle;
+  padding: 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Devices:
+   Device Type | Manufacturer | Current Firmware | Update Method */
+.devices-table th:nth-child(1),
+.devices-table td:nth-child(1) {
+  width: 20%;
+}
+
+.devices-table th:nth-child(2),
+.devices-table td:nth-child(2) {
+  width: 25%;
+}
+
+.devices-table th:nth-child(3),
+.devices-table td:nth-child(3) {
+  width: 30%;
+}
+
+.devices-table th:nth-child(4),
+.devices-table td:nth-child(4) {
+  width: 25%;
+}
+
+/* Update Status:
+   Device Type | Current | Latest | Known Versions | Non-Current */
+.update-status-table th:nth-child(1),
+.update-status-table td:nth-child(1) {
+  width: 24%;
+}
+
+.update-status-table th:nth-child(2),
+.update-status-table td:nth-child(2) {
+  width: 18%;
+}
+
+.update-status-table th:nth-child(3),
+.update-status-table td:nth-child(3) {
+  width: 18%;
+}
+
+.update-status-table th:nth-child(4),
+.update-status-table td:nth-child(4) {
+  width: 20%;
+}
+
+.update-status-table th:nth-child(5),
+.update-status-table td:nth-child(5) {
+  width: 20%;
+}
+
+td:last-child a {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.status-row p {
+  margin: 0;
+  color: #475569;
+}
+
+.status-badge,
+.table-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.table-status.current {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.table-status.latest {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.table-status.available {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.error-text {
+  color: #b91c1c;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+/* ---------- Firmware History responsive layout ---------- */
+
+/* Shared white card look (same as .panel) for the Firmware History section */
+.fw-panel {
+  /* 同 .panel：讓 grid item 可縮小，避免內容 intrinsic min-width 撐開頁面 */
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+/* Responsive container — never a fixed large width (no min-width: 1000px).
+   Grid auto-fits cards across columns on wide screens, single column on mobile. */
+.fw-history .fw-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+
+/* Each firmware record is its own independent visual card.
+   min-width: 0 lets the card shrink inside the grid so long values
+   (e.g. object_id) wrap instead of stretching the whole layout. */
+.fw-record {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.fw-record-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.fw-record-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.fw-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fw-status-latest {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.fw-status-available {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Labelled definition-list fields: each field is its own row with a clear
+   label + value, so fields never glue into one run of text. */
+.fw-fields {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  padding: 16px;
+}
+
+.fw-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fw-field-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5b6b7a;
+}
+
+.fw-field-value {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #334155;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Long string (object_id) — guaranteed to wrap without spaces,
+   so a 66-char hex value never forces horizontal overflow. */
+.fw-long-string {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* IOTA link — short text, wraps cleanly */
+.fw-iota-link {
+  color: #1d4ed8;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Mobile (≤640px): all four dashboard regions stack in a single column.
+   No horizontal overflow, no overlap, refresh button remains operable. */
+@media (max-width: 640px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fw-history-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .fw-history-toolbar-slot {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .dashboard-refresh-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .fw-history .fw-list {
+    grid-template-columns: 1fr;
+  }
+  .fw-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.update-status-table th:nth-child(4),
+.update-status-table td:nth-child(4),
+.update-status-table th:nth-child(5),
+.update-status-table td:nth-child(5) {
+  text-align: center;
+}
