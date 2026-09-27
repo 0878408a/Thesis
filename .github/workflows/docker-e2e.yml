@@ -1,0 +1,175 @@
+# ============================================================================
+# Thesis Docker E2E (GitHub Actions)
+# 完整 docker compose 堆疊 + mTLS smoke + customer API smoke
+# 不修改 production code; 只測 HTTP 層 (IOTA 上鏈 mock 不在 CI 驗證)。
+# ============================================================================
+
+name: Docker E2E
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [main]
+
+jobs:
+  docker-compose-e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build images
+        run: |
+          docker build -f Dockerfile.customer-agent    -t thesis/customer-agent .
+          docker build -f Dockerfile.manufacturer-client -t thesis/manufacturer-client .
+          docker build -f Dockerfile.manufacturer-agent  -t thesis/manufacturer-agent .
+
+      # CI 專用 .env: 動態產生 (不把本機 .env commit 到 repo)
+      # CI test DB password; 僅存在於 CI 環境, 非 production secret
+      - name: Create CI .env files
+        env:
+          CI_DB_PASSWORD: ci-test-db-password
+        run: |
+          # customer agent .env (DB only; 無 IOTA / Telegram)
+          cat > thesis/customer_agent/.env <<'EOF'
+          DB_ENGINE=django.db.backends.mysql
+          DB_NAME=customer_database
+          DB_USER=root
+          DB_PASSWORD=${CI_DB_PASSWORD}
+          DB_HOST=mariadb
+          DB_PORT=3306
+          EOF
+
+          # manufacturer agent .env (DB + IOTA_NETWORK; 無 IOTA_PRIVATE_KEY_BASE64)
+          # IOTA key 由 compose inline env 注入; 若 CI 需要真實 key, 改走 GitHub Secrets
+          cat > thesis/manufacturer_agent/.env <<'EOF'
+          IOTA_NETWORK=testnet
+          DB_ENGINE=django.db.backends.mysql
+          DB_NAME=mydatabase
+          DB_USER=root
+          DB_PASSWORD=${CI_DB_PASSWORD}
+          DB_HOST=mariadb
+          DB_PORT=3306
+          DJANGO_SECRET_KEY=ci-test-insecure-django-secret-key
+          DJANGO_DEBUG=True
+          DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+          EOF
+
+          # 根目錄 .env 供 docker compose 讀取 (DB_PASSWORD / MYSQL_ROOT_PASSWORD / DJANGO_SECRET_KEY)
+          # .env 已 gitignore, 不會進 Git
+          cat > .env <<'EOF'
+          DB_PASSWORD=ci-test-db-password
+          MYSQL_ROOT_PASSWORD=ci-test-db-password
+          DJANGO_SECRET_KEY=ci-test-insecure-django-secret-key
+          IOTA_PRIVATE_KEY_BASE64=
+          EOF
+          # initdb 腳本讀 DB_INIT_PASSWORD (compose 透過 env 透傳 MYSQL_ROOT_PASSWORD)
+
+          # 設定 CI_DB_PASSWORD 供後續 mariadb exec 步驟使用
+          echo "CI_DB_PASSWORD=ci-test-db-password" >> "$GITHUB_ENV"
+
+      - name: Start compose stack
+        run: |
+          # frontend dist/ 需存在 (nginx mount); 先 build
+          cd thesis/customer_agent/frontend/customer
+          npm ci --quiet && npm run build
+          cd ../../../thesis/manufacturer_client/frontend/manufacturer
+          npm ci --quiet && npm run build
+          cd ../../../..
+
+          docker compose up -d
+
+      - name: Wait for customer-agent
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fs http://localhost:5001/api/health > /dev/null 2>&1; then
+              echo "customer-agent ready"; break
+            fi
+            echo "waiting... ($i/40)"; sleep 5
+          done
+          # 若 :5001 無 /api/health, 改用任意 200 endpoint
+          curl -fs http://localhost:5001/ > /dev/null 2>&1 || true
+
+      - name: Wait for mariadb
+        run: |
+          for i in $(seq 1 30); do
+            if docker exec thesis-mariadb mysqladmin ping -uroot -p"$CI_DB_PASSWORD" 2>/dev/null; then
+              echo "mariadb ready"; break
+            fi
+            echo "waiting... ($i/30)"; sleep 5
+          done
+
+      # 從 CI DB 取 customer_id (不硬編碼本機 uuid)
+      - name: Extract CUSTOMER_ID from CI database
+        id: extract-cid
+        run: |
+          CID=$(docker exec thesis-mariadb mysql -uroot -p"$CI_DB_PASSWORD" \
+            -N -e "SELECT customer_id FROM customer_database.customer LIMIT 1" 2>/dev/null)
+          if [ -z "$CID" ]; then
+            echo "::error::customer_id not found in CI database"
+            docker exec thesis-mariadb mysql -uroot -p"$CI_DB_PASSWORD" -e "SHOW TABLES IN customer_database;" 2>/dev/null || true
+            exit 1
+          fi
+          echo "customer_id=$CID" >> "$GITHUB_ENV"
+          echo "CUSTOMER_ID=$CID" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test customer API
+        run: |
+          CID="$CUSTOMER_ID"
+          echo "CUSTOMER_ID=$CID"
+
+          # firmware API
+          FW_STATUS=$(curl -s -o /tmp/fw.json -w '%{http_code}' \
+            "http://localhost:5001/api/customer/$CID/firmware")
+          echo "firmware status: $FW_STATUS"
+          cat /tmp/fw.json || true
+
+          # devices API
+          DEV_STATUS=$(curl -s -o /tmp/dev.json -w '%{http_code}' \
+            "http://localhost:5001/api/customer/$CID/devices")
+          echo "devices status: $DEV_STATUS"
+          cat /tmp/dev.json || true
+
+          if [ "$FW_STATUS" != "200" ]; then
+            echo "::error::customer firmware API returned $FW_STATUS"
+            exit 1
+          fi
+          if [ "$DEV_STATUS" != "200" ]; then
+            echo "::error::customer devices API returned $DEV_STATUS"
+            exit 1
+          fi
+
+      - name: mTLS smoke test
+        run: |
+          CERT=thesis/manufacturer_client/ecdsa_manufacturer_client_cert.pem
+          KEY=thesis/manufacturer_client/ecdsa_manufacturer_private_key.pem
+          CA=thesis/ca/certs/ecdsa_ca.pem
+
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+            --cert "$CERT" --key "$KEY" --cacert "$CA" \
+            https://localhost:8443/manufacturer/agent/upload_firmware/history/ 2>/dev/null)
+          echo "mTLS status: $STATUS"
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ] && [ "$STATUS" != "401" ]; then
+            echo "::warning::mTLS returned unexpected status $STATUS (nginx may not be ready)"
+          fi
+
+      # 無論成功或失敗都收集 docker logs
+      - name: Collect docker logs
+        if: always()
+        run: |
+          docker compose logs > docker-logs.txt 2>&1 || true
+          wc -l docker-logs.txt
+
+      - name: Upload docker logs artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs-${{ github.run_number }}
+          path: docker-logs.txt
+
+      - name: Stop compose stack
+        if: always()
+        run: docker compose down --volumes

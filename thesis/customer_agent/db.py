@@ -128,6 +128,46 @@ def get_customer_chat_info(customer_id):
             """, (customer_id,))
             return cursor.fetchone()
 
+# 判斷指定 customer_id 是否存在於 customer 表
+def customer_exists(customer_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 1 FROM customer
+                WHERE customer_id = %s
+                LIMIT 1
+                """, (customer_id,))
+            return cursor.fetchone() is not None
+
+# 查詢指定 customer 名下裝置可用的 firmware 記錄（多筆）
+# JOIN customer_device / firmwaremetadata / manufacturer，
+# 回傳該 customer 所屬 (manufacturer_id, device_type) 組合下的所有 firmwaremetadata，
+# 並一併帶出 manufacturer_name，供 Customer Frontend 顯示。
+def get_firmware_records_by_customer_id(customer_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT
+                    fm.object_id,
+                    fm.manufacturer_id,
+                    m.manufacturer_name,
+                    fm.device_type,
+                    fm.firmware_version,
+                    fm.firmware_size,
+                    fm.release_date
+                FROM customer_device cd
+                JOIN firmwaremetadata fm
+                  ON cd.manufacturer_id = fm.manufacturer_id
+                 AND cd.device_type = fm.device_type
+                JOIN manufacturer m
+                  ON m.manufacturer_id = fm.manufacturer_id
+                WHERE cd.customer_id = %s
+                ORDER BY fm.release_date DESC
+            """
+            cursor.execute(sql, (customer_id,))
+            return cursor.fetchall()
+
 # 需要發送 firmware 下載請求時， 查詢該版本的 metadata 欄位放入 payload 中
 # 透過 customer_id 查 customer_device 的資料表，
 # 找出同樣 manufacturer + device_type 並且和 query 下來的 firmware_version 不同的所有 firmwaremetadata
@@ -207,6 +247,24 @@ def get_manufacturer_cert(manufacturer_id):
     finally:
         conn.close()
         
+# 取得特定 customer_id 名下所有裝置，並 JOIN manufacturer 以取得 manufacturer_name
+def get_devices_by_customer_id(customer_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT cd.manufacturer_id,
+                       m.manufacturer_name,
+                       cd.device_type,
+                       cd.firmware_version AS current_firmware_version,
+                       cd.update_method
+                FROM customer_device cd
+                JOIN manufacturer m ON m.manufacturer_id = cd.manufacturer_id
+                WHERE cd.customer_id = %s
+                ORDER BY cd.device_type
+            """
+            cursor.execute(sql, (customer_id,))
+            return cursor.fetchall()
+
 # 查詢特定 customer_id 和與 query 下來 firmware_version 不同的裝置，找到 update_method、ip_address、manufacturer_id、device_type
 def get_devices_by_customer_and_version(customer_id, firmware_version):
     with get_db_connection() as conn:

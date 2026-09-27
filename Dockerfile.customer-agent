@@ -1,0 +1,37 @@
+# ============================================================================
+# Customer Agent (Flask, public :5001 / mTLS device :5000)
+# Build context: repository root (C:/Users/ailab/projects/Thesis)
+#
+# 安全原則:
+#   - 不把 .env 燒進 image (DB 密碼等一律由 compose env / volume 注入)
+#   - 憑證 .pem 目前為 git-tracked 學術用開發憑證, 可進 image;
+#     正式環境應改由 volume 掛入並設 CERT_DIR 環境變數覆蓋
+#   - CUSTOMER_AGENT_ENABLE_MDNS=0 : 容器內不廣播 mDNS
+# ============================================================================
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# mysqlclient 需要 libmariadb/gcc; pkg-config 偵測 .pc 檔
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc default-libmysqlclient-dev pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+COPY thesis/requirements.txt /app/requirements.txt
+RUN MYSQLCLIENT_CFLAGS="-I/usr/include/mariadb" MYSQLCLIENT_LDFLAGS="-L/usr/lib/x86_64-linux-gnu -lmariadb" \
+    pip install --no-cache-dir -r /app/requirements.txt
+
+COPY thesis/shared/ /app/shared/
+COPY thesis/customer_agent/ /app/customer_agent/
+# .env 不 COPY (避免把 DB 密碼 bake 進 image); 由 compose 以 volume 掛入
+# 既有 dev 憑證 .pem (git-tracked, 非 secret) 隨 customer_agent 目錄一併複製
+
+WORKDIR /app/customer_agent
+
+ENV PYTHONUNBUFFERED=1 \
+    CUSTOMER_AGENT_ENABLE_MDNS=0 \
+    DB_HOST=mariadb \
+    DB_PORT=3306
+
+EXPOSE 5000 5001
+
+CMD ["python", "run_customer_agent.py"]

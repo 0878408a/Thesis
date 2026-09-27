@@ -1,4 +1,5 @@
 # thesis/config.py
+import os
 from pathlib import Path
 
 # =========================================================
@@ -69,13 +70,45 @@ else:
 FIRMWARE_PATH_BLINK = MANUFACTURER_CLIENT_DIR / "blink.ino" / "blink.ino.bin"
 FIRMWARE_PATH_NO_BLINK = MANUFACTURER_CLIENT_DIR / "no_blink.ino" / "no_blink_ino.bin"
 
+# ============================================================================
+# 環境變數覆蓋 (Docker / 部署)
+# ----------------------------------------------------------------------------
+# 下列環境變數可用於覆蓋憑證/金鑰路徑, 讓容器可以從 volume mount 取得
+# 憑證, 而不需要把 private key bake 進 image。
+# 預設值為原始硬編碼路徑, 因此既有 host 開發行為完全不變。
+#   CERT_DIR  : 若設定, 所有憑證/金鑰路徑改指到此目錄
+# ============================================================================
+_CERT_DIR_OVERRIDE = os.getenv("CERT_DIR")
+
+if _CERT_DIR_OVERRIDE:
+    _cd = Path(_CERT_DIR_OVERRIDE)
+    CA_CERT_PATH = _cd / "ecdsa_ca.pem"
+    MANUFACTURER_PRIVATE_KEY_PATH = _cd / "ecdsa_manufacturer_private_key.pem"
+    MANUFACTURER_CERT_PATH = _cd / "ecdsa_manufacturer_client_cert.pem"
+    MANUFACTURER_AGENT_PRIVATE_KEY_PATH = _cd / "ecdsa_manufacturer_agent_private_key.pem"
+    MANUFACTURER_AGENT_CERT_PATH = _cd / "ecdsa_manufacturer_agent_public_cert.pem"
+    CUSTOMER_PRIVATE_KEY_PATH = _cd / "ecdsa_customer_private_key.pem"
+    CUSTOMER_CERT_PATH = _cd / "ecdsa_customer_public_cert.pem"
+    FULL_CHAIN_CERT_PATH = _cd / "full_chain_manufacturer_agent.pem"
+
 # =========================================================
 # API SETTINGS
 # =========================================================
 
 HOST = "0.0.0.0"
 PORT = 8000
-UPLOAD_URL = f"https://localhost:{PORT}/upload_firmware/upload/"
+# UPLOAD_URL / HISTORY_URL 支援環境變數覆蓋 (Docker 部署時指向 nginx mTLS 端點):
+#   UPLOAD_URL  : 預設 https://localhost/upload_firmware/upload/
+#   HISTORY_URL : 預設 https://localhost/upload_firmware/history/
+# 未設定時保留原 host 開發行為; Docker compose 中由 env 覆蓋。
+UPLOAD_URL = os.environ.get(
+    "UPLOAD_URL",
+    f"https://localhost:8443/upload_firmware/upload/",
+)
+HISTORY_URL = os.environ.get(
+    "HISTORY_URL",
+    f"https://localhost:8443/upload_firmware/history/",
+)
 
 # =========================================================
 # BLOCKCHAIN SCRIPT (manufacturer_agent 使用)

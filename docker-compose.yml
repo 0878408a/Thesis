@@ -34,7 +34,7 @@ services:
       DB_HOST: mariadb
       DB_PORT: "3306"
       DB_USER: root
-      DB_PASSWORD: ap365084
+      DB_PASSWORD: ${DB_PASSWORD:-}
       DB_NAME: customer_database
       CERT_DIR: /certs
     volumes:
@@ -69,15 +69,15 @@ services:
       DB_HOST: mariadb
       DB_PORT: "3306"
       DB_USER: root
-      DB_PASSWORD: ap365084
+      DB_PASSWORD: ${DB_PASSWORD:-}
       DB_NAME: mydatabase
       DJANGO_ALLOWED_HOSTS: "manufacturer-agent"
-      DJANGO_SECRET_KEY: "django-insecure-sz-1t24bvxud#ya78p#hng)=!upehnuhblq*^vnjsb4ibr5iet"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-}
       DJANGO_DEBUG: "True"
       # IOTA 上鏈環境變數 (與 thesis/manufacturer_agent/.env 一致; submit_firmware.ts 由 dotenv 讀 .env,
       # 但 npx tsx 在 image 內執行時 process.cwd() 不在該目錄, 故以 compose env 明確注入):
       IOTA_NETWORK: "testnet"
-      IOTA_PRIVATE_KEY_BASE64: "AW8+XT3NFjeh91PMrRg0N0JZdLkc3BaF8rWMO0s6Uvfz"
+      IOTA_PRIVATE_KEY_BASE64: ${IOTA_PRIVATE_KEY_BASE64:-}
       PACKAGE_ID: "0x08e70252b9d1ecd72456899d02450fd2f76cba1993b6d291d7c7094681a96933"
       MOVE_MODULE: "firmware_module"
       MOVE_FUNCTION: "publish"
@@ -174,7 +174,9 @@ services:
     image: mariadb:11
     container_name: thesis-mariadb
     environment:
-      MYSQL_ROOT_PASSWORD: ap365084
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-}
+      # initdb 腳本 (docker/initdb/*.py) 透過此 env 取得 root password, 避免硬編碼
+      DB_INIT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-}
       MYSQL_DATABASE: mydatabase
     command:
       - --default-authentication-plugin=mysql_native_password

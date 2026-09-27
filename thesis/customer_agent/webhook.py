@@ -3,7 +3,7 @@ import subprocess
 import sys
 import traceback
 import requests
-from db import get_customer_chat_info, mark_device_updated, get_firmware_by_version, update_device_ip_by_mac, get_device_by_ip  
+from db import get_customer_chat_info, mark_device_updated, get_firmware_by_version, update_device_ip_by_mac, get_device_by_ip, customer_exists, get_firmware_records_by_customer_id, get_devices_by_customer_id
 from telegram_notify import send_telegram_message
 import config
 
@@ -104,6 +104,41 @@ def download_firmware():
             "Content-Disposition": f"attachment; filename=fw_{version}.bin"
         }
     )
+
+# GET API 供 Customer Frontend 查詢該 customer 名下裝置可用的 firmware 記錄。
+# 資料來源為 firmwaremetadata（Customer Agent 已從 IOTA 偵測並寫入 DB 的已知版本），
+# JOIN manufacturer 帶出 manufacturer_name。回傳 JSON（Content-Type: application/json）。
+@app.route("/api/customer/<customer_id>/firmware", methods=["GET"])
+def customer_firmware(customer_id):
+    try:
+        if not customer_exists(customer_id):
+            return jsonify({"error": "customer not found"}), 404
+
+        records = get_firmware_records_by_customer_id(customer_id)
+
+        device_type = records[0]["device_type"] if records else None
+
+        return jsonify({
+            "customer_id": customer_id,
+            "device_type": device_type,
+            "firmwares": records,
+        })
+
+    except Exception as e:
+        print("[customer_firmware error]", e)
+        return jsonify({"error": "failed to load firmware records"}), 500
+
+# 回傳特定 customer_id 名下所有裝置（含 manufacturer_name）
+@app.route("/api/customer/<customer_id>/devices", methods=["GET"])
+def customer_devices(customer_id):
+    try:
+        if not customer_exists(customer_id):
+            return jsonify({"error": "customer not found"}), 404
+        devices = get_devices_by_customer_id(customer_id)
+        return jsonify({"customer_id": customer_id, "devices": devices})
+    except Exception as e:
+        print("[customer_devices error]", e)
+        return jsonify({"error": "failed to load devices"}), 500
 
 # 查詢資料庫中符合 customer_id 的 user。
 # 回傳第一筆符合的 bot_token、chat_id 資訊。

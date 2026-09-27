@@ -1,0 +1,30 @@
+# ============================================================================
+# Manufacturer Client service (Flask internal, :5002)
+# Build context: repository root
+#
+# 此 service 是 Manufacturer 端的內部 API 轉發層:
+#   上游 Nginx(:5002 http) → 本 service mTLS → Manufacturer Agent(:8000)
+# .env / 憑證不 bake; 一律 volume + env 注入。
+# ============================================================================
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# mysqlclient 需要 libmariadb/gcc; pkg-config 偵測 .pc 檔
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc default-libmysqlclient-dev pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+COPY thesis/requirements.txt /app/requirements.txt
+RUN MYSQLCLIENT_CFLAGS="-I/usr/include/mariadb" MYSQLCLIENT_LDFLAGS="-L/usr/lib/x86_64-linux-gnu -lmariadb" \
+    pip install --no-cache-dir -r /app/requirements.txt
+
+COPY thesis/shared/ /app/shared/
+COPY thesis/manufacturer_client/ /app/manufacturer_client/
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 5002
+
+CMD ["python", "manufacturer_client/service.py"]

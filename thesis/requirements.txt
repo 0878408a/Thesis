@@ -44,6 +44,7 @@ pydoc-markdown==4.8.2
 pyhumps==3.8.0
 PyMySQL==1.1.2
 pytest==8.3.5
+pytest-cov==7.1.0
 python-dotenv==1.0.1
 PyYAML==6.0.2
 register==0.1

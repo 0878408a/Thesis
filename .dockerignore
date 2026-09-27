@@ -1,0 +1,15 @@
+# 根目錄 build context (customer-agent / manufacturer-agent / manufacturer-client)
+node_modules
+*/node_modules
+.git
+*.log
+.env
+thesis/customer_agent/.env
+thesis/manufacturer_agent/.env
+__pycache__
+*/__pycache__
+.pytest_cache
+.coverage
+htmlcov
+dist
+thesis/customer_agent/frontend/customer/dist

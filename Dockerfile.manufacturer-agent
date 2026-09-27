@@ -1,0 +1,39 @@
+# ============================================================================
+# Manufacturer Agent (Django, :8000, mTLS 由 Nginx 終止或 Django 上層)
+# Build context: repository root
+#
+# 安全原則:
+#   - .env (IOTA key / DB 密碼) 一律由 compose env / volume 注入, 不 bake 進 image
+#   - mTLS 憑證 (git-tracked 學術用) 隨目錄複製; 正式環境改 volume 掛入
+#   - IOTA 上鏈經 `npx tsx submit_firmware.ts`, 需 node + 本專案 npm 套件
+# ============================================================================
+FROM python:3.10-slim
+
+# mysqlclient 需要 libmariadb / gcc; node 供 npx tsx 執行 IOTA 上鏈腳本
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc default-libmysqlclient-dev pkg-config curl ca-certificates && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY thesis/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+COPY thesis/shared/ /app/shared/
+COPY thesis/manufacturer_agent/ /app/manufacturer_agent/
+# IOTA / Move SDK: package.json + package-lock.json 供 npm ci (node_modules 不含 secret)
+COPY thesis/package.json /app/package.json
+COPY thesis/package-lock.json /app/package-lock.json
+RUN npm install --prefix /app
+
+WORKDIR /app/manufacturer_agent
+
+ENV PYTHONUNBUFFERED=1 \
+    DB_HOST=mariadb \
+    DB_PORT=3306
+
+EXPOSE 8000
+
+CMD ["python", "run_manufacturer_agent.py"]

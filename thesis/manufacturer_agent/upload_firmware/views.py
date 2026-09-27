@@ -16,6 +16,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.x509 import load_pem_x509_certificate
+from rest_framework import generics, serializers
+from rest_framework.pagination import PageNumberPagination
 
 '''
     運行 server 指令:
@@ -302,6 +304,48 @@ def ManufacturerUploadRespond(message, error_code=None, http_status=status.HTTP_
             "ManufacturerAgentSignatureAlgorithm": algorithm
         
         }, status=status.HTTP_200_OK if upload_result else http_status)
+
+
+# --- History API implementation (read-only listing of SubmitBlockRecord joined with FirmwareMetadata)
+
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class SubmitBlockRecordHistorySerializer(serializers.ModelSerializer):
+    firmware_version = serializers.CharField(source='metadata_id.firmware_version')
+    device_type = serializers.CharField(source='metadata_id.device_type')
+    firmware_size = serializers.IntegerField(source='metadata_id.firmware_size')
+    release_date = serializers.IntegerField(source='metadata_id.release_date')
+
+    class Meta:
+        model = SubmitBlockRecord
+        fields = [
+            'object_id',
+            'metadata_id',
+            'firmware_version',
+            'device_type',
+            'firmware_size',
+            'release_date',
+            'submit_block_result',
+        ]
+
+
+class HistoryListAPIView(generics.ListAPIView):
+    """GET /upload_firmware/history/
+
+    Returns SubmitBlockRecord joined with FirmwareMetadata fields.
+    Sorted by FirmwareMetadata.release_date DESC, then paginated.
+    """
+    serializer_class = SubmitBlockRecordHistorySerializer
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        # select_related to avoid N+1 and order by related firmwaremetadata.release_date DESC
+        return SubmitBlockRecord.objects.select_related('metadata_id').order_by('-metadata_id__release_date')
 
 
 '''

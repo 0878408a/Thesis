@@ -1,5 +1,6 @@
 import threading
 import time
+import os
 from webhook import app as webhook_app
 from query import run_query_pipeline  
 import socket
@@ -13,6 +14,20 @@ from config import (
     CUSTOMER_KEY_PATH,
     CA_CERT_PATH
 )
+
+# ============================================================================
+# 環境變數設定 (Docker / 可重映射 port)
+# ----------------------------------------------------------------------------
+# 預設值與原始硬編碼行為完全一致，僅供 Docker / 部署環境覆蓋:
+#   CUSTOMER_AGENT_PUBLIC_PORT  預設 5001 (public HTTPS, browser / frontend 用)
+#   CUSTOMER_AGENT_DEVICE_PORT  預設 5000 (mTLS, ESP32 / device 用)
+#   CUSTOMER_AGENT_ENABLE_MDNS  預設 1 (zeroconf 廣播; 容器內設 0 關閉)
+#   CUSTOMER_AGENT_ENABLE_PERIODIC_QUERY 預設 1 (定期 IOTA query; 容器內可設 0)
+# ============================================================================
+PUBLIC_PORT = int(os.getenv("CUSTOMER_AGENT_PUBLIC_PORT", "5001"))
+DEVICE_PORT = int(os.getenv("CUSTOMER_AGENT_DEVICE_PORT", "5000"))
+ENABLE_MDNS = os.getenv("CUSTOMER_AGENT_ENABLE_MDNS", "1") not in ("0", "false", "False")
+ENABLE_PERIODIC_QUERY = os.getenv("CUSTOMER_AGENT_ENABLE_PERIODIC_QUERY", "1") not in ("0", "false", "False")
 
 '''
     註冊 webhook 至 ngrok 指令:
@@ -51,24 +66,24 @@ def create_mtls_context():
         
     return context
 
-# 啟動共用的 webhook 伺服器（port 5000）
+# 啟動 device (mTLS) 伺服器
 def run_device_server():
-    print("HTTPS server 啟動於 https://0.0.0.0:5000")
+    print(f"mTLS server 啟動於 https://0.0.0.0:{DEVICE_PORT}")
     
     # 使用 make_server 取代 Flask dev server
     httpd = make_server(
         '0.0.0.0',
-        5000,
+        DEVICE_PORT,
         webhook_app,
         ssl_context=create_mtls_context()
     )
     httpd.serve_forever()
 
 def run_public_server():
-    print("HTTPS server 啟動於 https://0.0.0.0:5001")
+    print(f"public HTTPS server 啟動於 https://0.0.0.0:{PUBLIC_PORT}")
     httpd = make_server(
         '0.0.0.0',
-        5001,
+        PUBLIC_PORT,
         webhook_app,
         ssl_context=create_public_context()
     )
@@ -95,22 +110,28 @@ def get_local_ip():
 
 if __name__ == "__main__":
     
-    # mDNS Zeroconf 廣播，讓 esp32 可以透過 customer-agent.local:5000 來存取 customer_agent
-    local_ip = get_local_ip()
+    zeroconf = None
+    info = None
+    
+    if ENABLE_MDNS:
+        # mDNS Zeroconf 廣播，讓 esp32 可以透過 customer-agent.local:DEVICE_PORT 來存取 customer_agent
+        local_ip = get_local_ip()
 
-    info = ServiceInfo(
-    "_http._tcp.local.",
-    "customer-agent._http._tcp.local.",
-    addresses=[socket.inet_aton(local_ip)],
-    port=5000,
-    properties={},
-    server="customer-agent.local."
-    )
+        info = ServiceInfo(
+        "_http._tcp.local.",
+        "customer-agent._http._tcp.local.",
+        addresses=[socket.inet_aton(local_ip)],
+        port=DEVICE_PORT,
+        properties={},
+        server="customer-agent.local."
+        )
 
-    zeroconf = Zeroconf()
-    zeroconf.register_service(info)
+        zeroconf = Zeroconf()
+        zeroconf.register_service(info)
 
-    print(f"mDNS 服務已廣播: customer-agent.local:5000, IP={local_ip}")
+        print(f"mDNS 服務已廣播: customer-agent.local:{DEVICE_PORT}, IP={local_ip}")
+    else:
+        print("mDNS 廣播已關閉 (CUSTOMER_AGENT_ENABLE_MDNS=0)")
     
     # 多執行緒啟動 webhook 及 query 任務
     # 將每個執行緒設為守護執行緒（daemon=True），意思是：當主程式（main thread）結束時，這個執行緒也會自動終止。
@@ -119,12 +140,17 @@ if __name__ == "__main__":
     # 讓它去執行你指定的 target 函式（ run_device_server()、run_periodic_query()）。
     threading.Thread(target=run_public_server, daemon=True).start()
     threading.Thread(target=run_device_server, daemon=True).start()
-    threading.Thread(target=run_periodic_query, daemon=True).start()
+    
+    if ENABLE_PERIODIC_QUERY:
+        threading.Thread(target=run_periodic_query, daemon=True).start()
+    else:
+        print("定期 IOTA query 已關閉 (CUSTOMER_AGENT_ENABLE_PERIODIC_QUERY=0)")
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         print("已接收到 Ctrl+C，程式即將中止。")
-        zeroconf.unregister_service(info)
-        zeroconf.close()
+        if zeroconf is not None:
+            zeroconf.unregister_service(info)
+            zeroconf.close()

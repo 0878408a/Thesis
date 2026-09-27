@@ -1,7 +1,9 @@
 # =====================
 # 環境變數
 # =====================
+# 本機 .env 與 runtime credentials 不進 Git
 .env
+**/.env
 
 # =====================
 # Python
@@ -9,10 +11,16 @@
 __pycache__/
 *.pyc
 
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
 # =====================
 # Node
 # =====================
 node_modules/
+dist/
 
 # migrations 
 */migrations/

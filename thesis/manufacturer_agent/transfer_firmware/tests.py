@@ -68,7 +68,7 @@ class OneTimeDownloadTestCase(APITestCase):
             release_date=1672531200,
             manufacturer=self.manufacturer,
             device_type=self.device.device_type,
-            firmware_version="v1.0",
+            firmware_version="test_for_dev",
             firmware_data=self.content
         )
         # 儲存檔案路徑進快取
@@ -176,7 +176,7 @@ class DownloadFirmwareAPITestCase(APITestCase):
             release_date=1672531200,
             manufacturer=self.manufacturer,
             device_type=self.device.device_type,
-            firmware_version="v1.0",
+            firmware_version="test_for_dev",
             firmware_data=b"1" * 256
         )
 
@@ -365,7 +365,7 @@ class DownloadFirmwareAPITestCase(APITestCase):
 
         # 模擬簽章
         result = 1
-        url = "https://firmware.server.com/v1.0.bin"
+        url = "https://firmware.server.com/test_for_dev.bin"
         message = "Download approved."
         error_code = None
         raw_payload = f"{result}|{url}|{message}|".encode()

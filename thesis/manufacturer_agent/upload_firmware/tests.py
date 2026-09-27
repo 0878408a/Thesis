@@ -192,7 +192,7 @@ class UploadFirmwareAPITestCase(APITestCase):
         # firmware_size = decode 後的 binary 長度
         self.firmware_size = len(self.firmware_binary)
 
-        self.firmware_version = "v1.0"       
+        self.firmware_version = "test_for_dev"       
         
         # 組合簽章原始資料（raw data，不先雜湊，因為 ECDSA 驗章會自動雜湊）
         # metadata 要簽的資料
@@ -598,8 +598,8 @@ class UploadFirmwareAPITestCase(APITestCase):
         
         """版本相同，應失敗"""
         
-        self.post_firmware("v1.0")
-        response = self.post_firmware("v1.0")
+        self.post_firmware("test_for_dev")
+        response = self.post_firmware("test_for_dev")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json().get("Errorcode"), 3042)
 

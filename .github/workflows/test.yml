@@ -1,0 +1,163 @@
+# ============================================================================
+# Thesis Test (GitHub Actions)
+# 既有測試不回歸: 單測 + build + 結構驗證
+# 不引入任何 production secret; 學術用 git-tracked dev 憑證即可。
+# ============================================================================
+
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  # ----------------------------------------------------------------
+  # 1) Customer Agent (Flask) pytest
+  # ----------------------------------------------------------------
+  customer-agent-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install deps
+        run: pip install -r thesis/requirements.txt
+      - name: Run customer agent tests
+        working-directory: thesis/customer_agent
+        run: python -m pytest -q
+
+  # ----------------------------------------------------------------
+  # 2) Manufacturer Client (Flask) pytest
+  # ----------------------------------------------------------------
+  manufacturer-client-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install deps
+        run: pip install -r thesis/requirements.txt
+      - name: Run manufacturer client tests
+        working-directory: thesis/manufacturer_client
+        run: python -m pytest -q
+
+  # ----------------------------------------------------------------
+  # 3) Manufacturer Agent (Django) test (需 MariaDB service)
+  # ----------------------------------------------------------------
+  manufacturer-agent-tests:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MYSQL_ROOT_PASSWORD: ci-test-db-password
+          MYSQL_DATABASE: mydatabase
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mariadb-admin ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install deps
+        run: pip install -r thesis/requirements.txt
+      - name: Run Django tests
+        working-directory: thesis/manufacturer_agent
+        env:
+          DB_ENGINE: django.db.backends.mysql
+          DB_NAME: mydatabase
+          DB_USER: root
+          DB_PASSWORD: ci-test-db-password
+          DB_HOST: 127.0.0.1
+          DB_PORT: "3306"
+          DB_INIT_COMMAND: SET sql_mode='STRICT_TRANS_TABLES'
+          DB_CHARSET: utf8mb4
+        run: python manage.py test -v 2
+
+  # ----------------------------------------------------------------
+  # 4) Customer Frontend (Vitest + build)
+  # ----------------------------------------------------------------
+  customer-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: thesis/customer_agent/frontend/customer/package-lock.json
+      - name: Install deps
+        working-directory: thesis/customer_agent/frontend/customer
+        run: npm ci
+      - name: Run vitest
+        working-directory: thesis/customer_agent/frontend/customer
+        run: npm run test
+      - name: TypeScript check
+        working-directory: thesis/customer_agent/frontend/customer
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: thesis/customer_agent/frontend/customer
+        run: npm run build
+
+  # ----------------------------------------------------------------
+  # 5) Manufacturer Frontend (Vitest + build)
+  # ----------------------------------------------------------------
+  manufacturer-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: thesis/manufacturer_client/frontend/manufacturer/package-lock.json
+      - name: Install deps
+        working-directory: thesis/manufacturer_client/frontend/manufacturer
+        run: npm ci
+      - name: Run vitest
+        working-directory: thesis/manufacturer_client/frontend/manufacturer
+        run: npm run test
+      - name: TypeScript check
+        working-directory: thesis/manufacturer_client/frontend/manufacturer
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: thesis/manufacturer_client/frontend/manufacturer
+        run: npm run build
+
+  # ----------------------------------------------------------------
+  # 6) Docker images build (驗證 Dockerfile 語法/指令正確)
+  # ----------------------------------------------------------------
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build customer-agent image
+        run: docker build -f Dockerfile.customer-agent -t thesis/customer-agent .
+      - name: Build manufacturer-client image
+        run: docker build -f Dockerfile.manufacturer-client -t thesis/manufacturer-client .
+      - name: Build manufacturer-agent image
+        run: docker build -f Dockerfile.manufacturer-agent -t thesis/manufacturer-agent .
+
+  # ----------------------------------------------------------------
+  # 7) Nginx + compose 結構驗證 (語法檢查, 不需實際起 container)
+  # ----------------------------------------------------------------
+  nginx-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate docker-compose syntax
+        run: docker compose config -q
+      - name: Validate nginx.conf syntax
+        run: |
+          docker run --rm -v "$PWD/nginx/nginx.conf":/etc/nginx/nginx.conf:ro \
+            nginx:1.27-alpine nginx -t -c /etc/nginx/nginx.conf
