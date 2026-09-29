@@ -80,12 +80,15 @@ class FirmwareMetadata(models.Model):
     release_date = models.BigIntegerField()
     manufacturer_id = models.CharField(max_length=36)
     device_type = models.CharField(max_length=100)
-    firmware_version = models.CharField(max_length=50, unique=True)
+    # V2: unique per (manufacturer, device_type, firmware_version) — not global
+    firmware_version = models.CharField(max_length=50)
     firmware_data = models.BinaryField()
 
     class Meta:
         db_table = 'firmwaremetadata'
         managed = False
+        # 複合唯一鍵: 同一 manufacturer + device_type + firmware_version 不可重複
+        unique_together = (('manufacturer_id', 'device_type', 'firmware_version'),)
         # class Meta 是一個「內部類別（inner class）」，用來定設定與行為屬性。
         # 代表這個 Model 是用來對應資料庫中已存在的資料表，Django 不會幫你自動建立或修改這張表。
     

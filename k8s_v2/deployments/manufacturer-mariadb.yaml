@@ -1,0 +1,85 @@
+# V2: Manufacturer MariaDB — 獨立 Pod，只含 mydatabase
+# 使用獨立 PVC thesis-manufacturer-mariadb-data
+# MYSQL_DATABASE 仍為 mydatabase（Django APP_DATABASES 依 env 切）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manufacturer-mariadb
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: manufacturer-mariadb
+    app.kubernetes.io/part-of: thesis
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: manufacturer-mariadb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: manufacturer-mariadb
+    spec:
+      containers:
+        - name: mariadb
+          image: mariadb:11
+          args:
+            - --default-authentication-plugin=mysql_native_password
+          env:
+            - name: MYSQL_DATABASE
+              value: mydatabase
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: thesis-db-creds
+                  key: MYSQL_ROOT_PASSWORD
+            - name: DB_INIT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: thesis-db-creds
+                  key: DB_INIT_PASSWORD
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          resources:
+            requests:
+              memory: "256Mi"
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'mariadb-admin ping -h 127.0.0.1 --silent'
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: thesis-manufacturer-mariadb-data
+        - name: initdb
+          configMap:
+            name: thesis-mariadb-initdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: manufacturer-mariadb
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: manufacturer-mariadb
+    app.kubernetes.io/part-of: thesis
+spec:
+  selector:
+    app.kubernetes.io/name: manufacturer-mariadb
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306

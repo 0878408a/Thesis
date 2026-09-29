@@ -8,6 +8,7 @@ import time
 import subprocess
 import re
 import shutil
+import os
 from shared import config
 from django.db.utils import IntegrityError # 這個模組提供了與資料庫相關的錯誤處理
 from .models import Manufacturer, Device
@@ -141,44 +142,30 @@ def verify_signature(metadata_json, manufacturer_cert, signature_field, signatur
         print(f"[DEBUG] Signature verification failed: {e}")
         return False
     
-# 函式 upload_to_blockchain() 定義: 上鏈邏輯，將 firmware_metadata 上鏈供 customer 查詢
+# V2: upload_to_blockchain() — bounded retry + subprocess timeout
 def upload_to_blockchain(firmware_metadata, retry_interval=5, max_retries=None):
-    
-    '''
-    不斷嘗試將 metadata 上鏈直到成功，或達到最大重試次數。
-    
-    參數:
-    - manufacturer: manufacturer_id
-    - device: 裝置型號
-    - metadata_obj: FirmwareMetadata 資料
-    - retry_interval: 每次重試間隔（秒）
-    - max_retries: 最大重試次數，若為 None 則無限重試
-    '''
-    
-    # 重試次數的計數器
+    """
+    V2: bounded retry + subprocess timeout.
+    - max_retries defaults to IOTA_MAX_RETRIES (env var, default 3)
+    - subprocess.run() timeout=IOTA_SUBPROCESS_TIMEOUT (env var, default 120s)
+    - On exhaustion: raise RuntimeError with clear message (caller returns 500)
+    - DB record preserved for manual retry
+    """
+    IOTA_SUBPROCESS_TIMEOUT = int(os.environ.get("IOTA_SUBPROCESS_TIMEOUT", "120"))
+    IOTA_MAX_RETRIES_DEFAULT = int(os.environ.get("IOTA_MAX_RETRIES", "3"))
+    max_retries = max_retries if max_retries is not None else IOTA_MAX_RETRIES_DEFAULT
     attempts = 0
+    last_error = None
+
     while True:
-        
-        object_id = None # 物件 ID，預設為 None，若上鏈成功會更新為實際的 object_id
-        #npx_path = "C:/Users/User/AppData/Roaming/npm/npx.cmd"
+        object_id = None
         tsx_script_path = config.SUBMIT_FIRMWARE_TS_PATH
-        
-        # shutil 是 Python 標準函式庫中的一個模組，主要用於檔案與資料夾操作
-        print(shutil.which("npx"))
         npx_path = shutil.which("npx")
-        # shutil.which() 會在系統的 PATH 環境變數中搜尋指定的命令，並回傳其完整路徑
         if not npx_path:
             raise RuntimeError("找不到 npx，請確認已安裝 node/npm 並設定 PATH")
         try:
-            # 組合 CLI 參數
-            args = [ 
-                # npx tsx 為 npm 套件，是一個可以直接執行 TypeScript .ts 檔案的命令，無需事先編譯成 JavaScript .js
+            args = [
                 npx_path, "tsx", tsx_script_path,
-                
-                # 將資料轉成 UTF-8 編碼的 Python 字串
-                # 簽章的 Raw signature bytes 不能直接 .decode('utf-8')，因為這些是隨機二進位值，不一定是合法 UTF-8，會報錯
-                # base64.b64encode(...): 簽章欄位的 bytes 資料轉為可傳輸文字
-                # .decode('utf-8'): 將 base64 bytes 變成字串以便 JSON 傳輸，使用 str 包含前綴 b'' 與 escape 字元，會導至驗章失敗
                 str(firmware_metadata.metadata_signature_algorithm),
                 base64.b64encode(firmware_metadata.metadata_signature).decode('utf-8'),
                 str(firmware_metadata.firmware_signature_algorithm),
@@ -189,57 +176,41 @@ def upload_to_blockchain(firmware_metadata, retry_interval=5, max_retries=None):
                 str(firmware_metadata.device_type),
                 str(firmware_metadata.firmware_version),
             ]
-
-            # subprocess 是 Python 標準函式庫中的一個模組，主要用途是讓 Python 能夠呼叫外部指令或執行其他程式
-            # 使用 subprocess.run() 帶入 args 執行 CLI 命令
-            # capture_output=True 把執行結果的 stdout / stderr 都取出來儲存在 result.stdout / result.stderr 裡
-            # capture_output 和 text 參數主要目的是讀取輸出的 objectId
-            # text=True 將 stdout / stderr 轉為字串（預設是 bytes）
-            # encoding="utf-8" 指定編碼格式為 UTF-8，避免 Windows 預設的 cp950 導致解碼錯誤
-            result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8")
-
-            # result.returncode: 是外部程式結束時回傳給作業系統的狀態碼，也稱為 exit code，0 代表成功，非 0 代表失敗
+            result = subprocess.run(
+                args, capture_output=True, text=True, encoding="utf-8",
+                timeout=IOTA_SUBPROCESS_TIMEOUT
+            )
             if result.returncode != 0:
                 raise Exception(f"上鏈失敗: {result.stderr}")
-
-            # 從 stdout 擷取 objectId
-            # result.stdout：是用 subprocess.run(...) 執行 TypeScript 程式後的標準輸出（stdout），
-            # 也就是 TypeScript 程式用 console.log(...) 印出來的內容。
-            # re.search(...)：使用正規表示法（regular expression）在這段輸出中搜尋特定格式的文字。
-            # r"OBJECT_ID:([a-zA-Z0-9x]+)"：
-            # 這是匹配格式為 OBJECT_ID:xxx... 的字串
-            #   OBJECT_ID: 是固定前綴
-            #   ([a-zA-Z0-9x]+) 是捕捉 group，代表 objectId 的內容，
-            #   允許的字元包括英文字母大小寫、數字、以及 x（像是 0xabc123...）
             match = re.search(r"OBJECT_ID:([a-zA-Z0-9x]+)", result.stdout)
             if not match:
                 raise Exception("找不到 objectId，stdout: " + result.stdout)
-
-            # 把 OBJECT_ID 內容這段字串「捕捉」起來，放在 group(1) 裡
             object_id = match.group(1)
-
-            # 將上鏈的相關記錄及回傳結果存入資料庫
             SubmitBlockRecord.objects.create(
                 object_id=object_id,
                 metadata_id=firmware_metadata,
                 submit_block_result=result.stdout,
             )
-
             print(f"[上鏈成功] object_id={object_id}, version={firmware_metadata.firmware_version}")
+            return
+        except subprocess.TimeoutExpired as e:
+            last_error = f"IOTA subprocess timed out after {IOTA_SUBPROCESS_TIMEOUT}s"
+            print(f"[上鏈超時] {last_error}, object_id={object_id}")
             break
-
         except Exception as e:
-            print(f"[上鏈通知失敗]  object_id={object_id}， 錯誤：{e}")
-            # 重試次數加 1
+            last_error = str(e)
+            print(f"[上鏈通知失敗] object_id={object_id}, 錯誤: {e}")
             attempts += 1
-                        
-            # 若設定最大重試次數，且已達上限，就放棄
-            if max_retries is not None and attempts >= max_retries:
-                print(f"[已達最大重試次數]  object_id={object_id}，停止重試")
+            if attempts >= max_retries:
                 break
-                        
-            # 等待一段時間後重試
             time.sleep(retry_interval)
+
+    raise RuntimeError(
+        f"IOTA submission failed (attempts={attempts}). "
+        f"Firmware metadata saved in DB (id={firmware_metadata.id}) but blockchain "
+        f"submission did not complete. Last error: {last_error}. "
+        f"DB record preserved for manual retry."
+    )
 
 # 函式 ManufacturerUploadRespond() 定義: 封裝回傳訊息的格式，並支援 RSA / ECDSA 簽章（Base64 編碼）   
 # http_status 參數預設為 400，若遇到其他錯誤 (如 404、500) 再傳入自訂的 http_status 
@@ -589,7 +560,13 @@ class UploadFirmwareAPIView(APIView):
         ).exists()  
         
         if existing_version:
-            return ManufacturerUploadRespond("FirmwareVersion 版本號重複", 3042)
+            # V2: 明確回 HTTP 409 Conflict，讓 concurrency test 可辨識
+            return ManufacturerUploadRespond(
+                f"Firmware version '{incoming_version}' already exists for manufacturer "
+                f"{manufacturer.manufacturer_id} / device {device.device_type}",
+                3042,
+                http_status=status.HTTP_409_CONFLICT
+            )
 
         # 檢查 FirmwareData 是否為合法 base64，以及檢查 FirmwareData 長度是否與 FirmwareSize 相符
         valid, firmware_binary = is_valid_base64(firmware_data)
@@ -615,26 +592,32 @@ class UploadFirmwareAPIView(APIView):
             return ManufacturerUploadRespond("Firmware signature verification failed.", 2012)
         
         try:
-            # 資料儲存 
-            # .objects.create(...) 是 Django ORM（Object-Relational Mapping）提供的一個快捷方法，用來建立資料並直接儲存到資料庫。 
-            # 使用.objects.create 將資料儲存到 FirmwareMetadata 資料表中      
-            firmware_metadata = FirmwareMetadata.objects.create( 
-                metadata_signature=decoded_fields["metadata_signature"],
-                metadata_signature_algorithm=metadata_json["metadata_signature_algorithm"],
-                firmware_signature=decoded_fields["firmware_signature"],
-                firmware_signature_algorithm=metadata_json["firmware_signature_algorithm"],
-                firmware_size=int(metadata_json["firmware_size"]),
-                release_date=int(metadata_json["release_date"]),
-                manufacturer_id=manufacturer.manufacturer_id,
-                device_type=device.device_type,
-                firmware_version=metadata_json["firmware_version"],
-                firmware_data=firmware_binary
-            )    
+            # V2: 以 transaction.atomic() 包住 INSERT，讓 DB unique constraint
+            # 作為最終保護，避免 check-then-insert race
+            from django.db import transaction
+            with transaction.atomic():
+                firmware_metadata = FirmwareMetadata.objects.create(
+                    metadata_signature=decoded_fields["metadata_signature"],
+                    metadata_signature_algorithm=metadata_json["metadata_signature_algorithm"],
+                    firmware_signature=decoded_fields["firmware_signature"],
+                    firmware_signature_algorithm=metadata_json["firmware_signature_algorithm"],
+                    firmware_size=int(metadata_json["firmware_size"]),
+                    release_date=int(metadata_json["release_date"]),
+                    manufacturer_id=manufacturer.manufacturer_id,
+                    device_type=device.device_type,
+                    firmware_version=metadata_json["firmware_version"],
+                    firmware_data=firmware_binary
+                )
 
-        # 韌體相關資料儲存若有錯誤回傳 Database error 5001
-        # IntegrityError 是 Django ORM 中的一個例外類型，通常用來處理資料庫的完整性約束錯誤，例如唯一性約束違反、外鍵約束違反等。
+        # V2: 唯一性約束違反 → 明確回 HTTP 409 Conflict（concurrency safe）
         except IntegrityError as e:
-            return ManufacturerUploadRespond(f"Database error: {str(e)}", 5001)
+            return ManufacturerUploadRespond(
+                f"Duplicate firmware version: {incoming_version} "
+                f"(manufacturer {manufacturer.manufacturer_id}, "
+                f"device {device.device_type}). Conflict detected.",
+                3042,
+                http_status=status.HTTP_409_CONFLICT
+            )
         except Exception as e:
             return ManufacturerUploadRespond(f"Database Unexpected error: {str(e)}", 5002)
         

@@ -1,0 +1,140 @@
+# V2: Seed scripts ConfigMap — 分別 seed manufacturer-mariadb 和 customer-mariadb
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: thesis-v2-seed-scripts
+  namespace: thesis
+  labels:
+    app.kubernetes.io/part-of: thesis
+data:
+  # 只 seed mydatabase (在 manufacturer-mariadb 上)
+  run_manufacturer_seed.py: |
+    import re, os, pymysql
+
+    SQL_DIR = os.environ.get("SQL_DIR", "/sql")
+    MANUFACTURER_DIR = "manufacturer_agent_db"
+    DB = "mydatabase"
+    # FK-safe order: manufacturer → device → customer → firmwaremetadata → submit_block_record
+    FILES = ["manufacturer", "device", "customer", "firmwaremetadata", "submit_block_record"]
+
+
+    def _root_pw():
+        return os.environ.get("DB_INIT_PASSWORD") or os.environ.get("MYSQL_ROOT_PASSWORD")
+
+
+    def read_sql(name):
+        with open(os.path.join(SQL_DIR, MANUFACTURER_DIR, f"{name}.sql"), encoding="utf-8") as f:
+            return f.read()
+
+
+    def collect_statements(files):
+        stmts = []
+        for name in files:
+            raw = read_sql(name)
+            raw = re.sub(r'/\*!\d+[^*]*\*/', '', raw, flags=re.S)
+            for t in files:
+                raw = re.sub(rf'(?<![`\w.])`{t}`', f'`{DB}`.`{t}`', raw)
+            for s in [x.strip() for x in raw.split(';') if x.strip()]:
+                s = re.sub(r'(?m)^\s*--.*$', '', s).strip()
+                if s.startswith('CREATE TABLE') or s.startswith('INSERT INTO'):
+                    stmts.append(s)
+        return stmts
+
+
+    if __name__ == "__main__":
+        pw = _root_pw()
+        host = os.environ.get("DB_HOST", "manufacturer-mariadb")
+        port = int(os.environ.get("DB_PORT", "3306"))
+        conn = pymysql.connect(host=host, port=port, user='root', password=pw)
+        cur = conn.cursor()
+        cur.execute(f"CREATE DATABASE IF NOT EXISTS {DB} CHARACTER SET utf8mb4")
+        cur.execute(f"USE `{DB}`")
+        stmts = collect_statements(FILES)
+        for stmt in stmts:
+            label = stmt[:50].replace("\n", " ")
+            try:
+                cur.execute(stmt)
+                conn.commit()
+                print("MFG OK  :", label)
+            except Exception as e:
+                conn.rollback()
+                print("MFG ERR :", str(e)[:70], "||", label)
+        cur.execute(f'SHOW TABLES IN {DB}')
+        print(f"{DB} TABLES:", [r[0] for r in cur.fetchall()])
+        conn.close()
+        print(f"MFG DONE {DB}")
+
+  # 只 seed customer_database (在 customer-mariadb 上)
+  run_customer_seed.py: |
+    import re, os, pymysql
+
+    SQL_DIR = os.environ.get("SQL_DIR", "/sql")
+    CUSTOMER_DIR = "customer_agent_db"
+    DB = "customer_database"
+    # FK-safe order: manufacturer → device → customer → firmwaremetadata → customer_device
+    FILES = ["manufacturer", "device", "customer", "firmwaremetadata", "customer_device"]
+
+
+    def _root_pw():
+        return os.environ.get("DB_INIT_PASSWORD") or os.environ.get("MYSQL_ROOT_PASSWORD")
+
+
+    def read_sql(name):
+        with open(os.path.join(SQL_DIR, CUSTOMER_DIR, f"{name}.sql"), encoding="utf-8") as f:
+            return f.read()
+
+
+    def collect_statements(files):
+        stmts = []
+        for name in files:
+            raw = read_sql(name)
+            raw = re.sub(r'/\*!\d+[^*]*\*/', '', raw, flags=re.S)
+            for t in files:
+                raw = re.sub(rf'(?<![`\w.])`{t}`', f'`{DB}`.`{t}`', raw)
+            for s in [x.strip() for x in raw.split(';') if x.strip()]:
+                s = re.sub(r'(?m)^\s*--.*$', '', s).strip()
+                if s.startswith('CREATE TABLE') or s.startswith('INSERT INTO'):
+                    stmts.append(s)
+        return stmts
+
+
+    def _seed_customer_row(cur, conn):
+        try:
+            cur.execute(
+                "INSERT INTO `customer_database`.`customer` "
+                "(customer_id,name,email,customer_cert,bot_token,chatid) "
+                "VALUES (%s,%s,%s,%s,%s,%s) "
+                "ON DUPLICATE KEY UPDATE name=VALUES(name)",
+                ("3e01e6a7-1c25-4a5e-97c5-92ec5abfd10c", "Thesis Customer",
+                 "thesis@example.com", b"PEM-PLACEHOLDER", "test-token", "test-chat"))
+            conn.commit()
+            cur.execute("SELECT customer_id FROM `customer_database`.`customer`")
+            print("CUSTOMERS:", [r[0] for r in cur.fetchall()])
+        except Exception as e:
+            conn.rollback()
+            print("customer seed ERR:", str(e)[:70])
+
+
+    if __name__ == "__main__":
+        pw = _root_pw()
+        host = os.environ.get("DB_HOST", "customer-mariadb")
+        port = int(os.environ.get("DB_PORT", "3306"))
+        conn = pymysql.connect(host=host, port=port, user='root', password=pw)
+        cur = conn.cursor()
+        cur.execute(f"CREATE DATABASE IF NOT EXISTS {DB} CHARACTER SET utf8mb4")
+        cur.execute(f"USE `{DB}`")
+        stmts = collect_statements(FILES)
+        for stmt in stmts:
+            label = stmt[:50].replace("\n", " ")
+            try:
+                cur.execute(stmt)
+                conn.commit()
+                print("CUST OK  :", label)
+            except Exception as e:
+                conn.rollback()
+                print("CUST ERR :", str(e)[:70], "||", label)
+        _seed_customer_row(cur, conn)
+        cur.execute(f'SHOW TABLES IN {DB}')
+        print(f"{DB} TABLES:", [r[0] for r in cur.fetchall()])
+        conn.close()
+        print(f"CUST DONE {DB}")

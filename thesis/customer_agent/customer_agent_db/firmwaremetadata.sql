@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS `firmwaremetadata` (
   `firmware_version` varchar(50) NOT NULL,
   `firmware_data` longblob NOT NULL,
   PRIMARY KEY (`object_id`),
-  UNIQUE KEY `firmware_version` (`firmware_version`),
   UNIQUE KEY `object_id` (`object_id`),
+  UNIQUE KEY `uq_mfr_dev_fwm` (`manufacturer_id`,`device_type`,`firmware_version`),
   KEY `FK_notify_firmwaremetadata_device_record` (`manufacturer_id`,`device_type`),
   CONSTRAINT `FK_notify_firmwaremetadata_device_record` FOREIGN KEY (`manufacturer_id`, `device_type`) REFERENCES `device` (`manufacturer_id`, `device_type`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

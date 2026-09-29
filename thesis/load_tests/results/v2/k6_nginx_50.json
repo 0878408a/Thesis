@@ -1,0 +1,208 @@
+{
+    "metrics": {
+        "http_req_failed{endpoint:customer_firmware}": {
+            "passes": 0,
+            "fails": 657,
+            "thresholds": {
+                "rate<0.05": false
+            },
+            "value": 0
+        },
+        "http_req_failed{endpoint:customer_devices}": {
+            "passes": 0,
+            "fails": 657,
+            "thresholds": {
+                "rate<0.05": false
+            },
+            "value": 0
+        },
+        "vus": {
+            "value": 15,
+            "min": 15,
+            "max": 50
+        },
+        "http_req_connecting": {
+            "avg": 0.5968578386605782,
+            "min": 0,
+            "med": 0,
+            "max": 27.2117,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "devices_api_errors": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "http_req_duration": {
+            "avg": 2229.736592009133,
+            "min": 33.6616,
+            "med": 2456.56855,
+            "max": 5194.7156,
+            "p(90)": 4002.3675200000002,
+            "p(95)": 4444.955865
+        },
+        "vus_max": {
+            "min": 50,
+            "max": 50,
+            "value": 50
+        },
+        "http_reqs": {
+            "count": 1314,
+            "rate": 20.884660983708823
+        },
+        "http_req_blocked": {
+            "med": 0,
+            "max": 3891.3365,
+            "p(90)": 0,
+            "p(95)": 0.510435,
+            "avg": 104.5382789954338,
+            "min": 0
+        },
+        "http_req_sending": {
+            "min": 0,
+            "med": 0,
+            "max": 64.7412,
+            "p(90)": 0.019970000000000005,
+            "p(95)": 0.5318549999999999,
+            "avg": 0.25287496194824954
+        },
+        "http_req_duration{expected_response:true}": {
+            "max": 5194.7156,
+            "p(90)": 4002.3675200000002,
+            "p(95)": 4444.955865,
+            "avg": 2229.736592009133,
+            "min": 33.6616,
+            "med": 2456.56855
+        },
+        "http_req_tls_handshaking": {
+            "avg": 102.53017617960427,
+            "min": 0,
+            "med": 0,
+            "max": 3834.871,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 1314,
+            "value": 0
+        },
+        "data_sent": {
+            "count": 275393,
+            "rate": 4377.084811481373
+        },
+        "iterations": {
+            "rate": 10.442330491854412,
+            "count": 657
+        },
+        "devices_api_duration": {
+            "avg": 2216.2426563165923,
+            "min": 44.8989,
+            "med": 2432.5616,
+            "max": 5059.398,
+            "p(90)": 4026.7,
+            "p(95)": 4446.888359999999
+        },
+        "data_received": {
+            "count": 686491,
+            "rate": 10911.05921108619
+        },
+        "checks": {
+            "passes": 3942,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_receiving": {
+            "max": 7.2306,
+            "p(90)": 0.5632,
+            "p(95)": 0.6023,
+            "avg": 0.21525837138508375,
+            "min": 0,
+            "med": 0
+        },
+        "firmware_api_errors": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "http_req_waiting": {
+            "avg": 2229.2684586758023,
+            "min": 33.6616,
+            "med": 2456.56855,
+            "max": 5194.7156,
+            "p(90)": 4002.3675200000002,
+            "p(95)": 4444.748665
+        },
+        "firmware_api_duration": {
+            "max": 5194.7156,
+            "p(90)": 3954.43264,
+            "p(95)": 4429.115019999998,
+            "avg": 2243.2305277016753,
+            "min": 33.6616,
+            "med": 2472.4862
+        },
+        "iteration_duration": {
+            "med": 4637.4591,
+            "max": 9957.0806,
+            "p(90)": 7585.979899999999,
+            "p(95)": 8217.540679999998,
+            "avg": 4669.73308599696,
+            "min": 79.8564
+        }
+    },
+    "root_group": {
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "firmware status 200": {
+                    "name": "firmware status 200",
+                    "path": "::firmware status 200",
+                    "id": "0e57c6e7c60844fad14c90ede2040f8d",
+                    "passes": 657,
+                    "fails": 0
+                },
+                "firmware content-type json": {
+                    "id": "5893fb3e3f2cd2ecbee398d115f99156",
+                    "passes": 657,
+                    "fails": 0,
+                    "name": "firmware content-type json",
+                    "path": "::firmware content-type json"
+                },
+                "firmware valid json": {
+                    "name": "firmware valid json",
+                    "path": "::firmware valid json",
+                    "id": "0e69dd104cbac7fe78f0cb39f9c7e71d",
+                    "passes": 657,
+                    "fails": 0
+                },
+                "devices status 200": {
+                    "name": "devices status 200",
+                    "path": "::devices status 200",
+                    "id": "91fa2eb8afb3b709b55bb42e80a40b91",
+                    "passes": 657,
+                    "fails": 0
+                },
+                "devices content-type json": {
+                    "name": "devices content-type json",
+                    "path": "::devices content-type json",
+                    "id": "4514f7e78dc33f9eef9498c665ab2d8b",
+                    "passes": 657,
+                    "fails": 0
+                },
+                "devices valid json": {
+                    "name": "devices valid json",
+                    "path": "::devices valid json",
+                    "id": "f9d2a81e17d54dc9d6a863659a89ce33",
+                    "passes": 657,
+                    "fails": 0
+                }
+            },
+        "name": ""
+    }
+}

@@ -48,8 +48,10 @@ const CUSTOMER_ID  = __ENV.CUSTOMER_ID  || '3e01e6a7-1c25-4a5e-97c5-92ec5abfd10c
 // ---- custom metrics: 分別量測兩個 API ----
 const firmwareApiDuration = new Trend('firmware_api_duration', false, 'ms');
 const devicesApiDuration  = new Trend('devices_api_duration',  false, 'ms');
+// 5xx 為 application error; 404 單獨統計 (seeded customer 不應出現 404)
 const firmwareApiErrors   = new Counter('firmware_api_errors');
 const devicesApiErrors    = new Counter('devices_api_errors');
+const customer404Responses = new Counter('customer_404_responses');
 
 // ============================================================================
 // 主執行路徑: 兩 API 各測一次, 無 sleep (讓 VU 全速跑, 看真實極限)
@@ -67,6 +69,7 @@ function doFirmware() {
     tls: { insecureSkipTLSVerify: true }, // Docker 自簽憑證
     timeout: '10s',
   });
+  if (resp.status === 404) customer404Responses.add(1);
   let jsonValid = false;
   let statusOk = false;
   let ctypeOk = false;
@@ -82,11 +85,8 @@ function doFirmware() {
     'firmware valid json': (r) => {
       if (r.status !== 200) return false;
       try {
-        const j = JSON.parse(
-          r.body,
-          _ => {},
-          (k, v) => (k === 'firmwares' ? Array.from(v, (x) => x) : v)
-        );
+        // JSON.parse 回傳物件中 firmwares 已是 Array; 無需 reviver
+        const j = JSON.parse(r.body);
         jsonValid = j.customer_id === CUSTOMER_ID && Array.isArray(j.firmwares);
         return jsonValid;
       } catch {
@@ -96,6 +96,8 @@ function doFirmware() {
   });
   const ok = passed > 0 && statusOk && ctypeOk && jsonValid;
   firmwareApiDuration.add(resp.timings.duration);
+  // 只有 5xx 才算 application error; 404 在 seeded customer 情境下也是失誤, 但語意不同,
+  // 故 404 也記為 application error (保持 count==0 threshold 嚴謹)
   if (!ok) firmwareApiErrors.add(1);
   return ok;
 }
@@ -106,6 +108,7 @@ function doDevices() {
     tls: { insecureSkipTLSVerify: true },
     timeout: '10s',
   });
+  if (resp.status === 404) customer404Responses.add(1);
   let jsonValid = false;
   let statusOk = false;
   let ctypeOk = false;
@@ -121,11 +124,8 @@ function doDevices() {
     'devices valid json': (r) => {
       if (r.status !== 200) return false;
       try {
-        const j = JSON.parse(
-          r.body,
-          _ => {},
-          (k, v) => (k === 'devices' ? Array.from(v, (x) => x) : v)
-        );
+        // JSON.parse 回傳物件中 devices 已是 Array; 無需 reviver
+        const j = JSON.parse(r.body);
         jsonValid = j.customer_id === CUSTOMER_ID && Array.isArray(j.devices);
         return jsonValid;
       } catch {
@@ -147,6 +147,9 @@ export const options = {
   thresholds: {
     'http_req_failed{endpoint:customer_firmware}': ['rate<0.05'],
     'http_req_failed{endpoint:customer_devices}':  ['rate<0.05'],
+    // 明確 application error threshold: seeded customer 情境下, 任何 API 錯誤 (含 404) 都視為異常
+    'firmware_api_errors': ['count==0'],
+    'devices_api_errors':  ['count==0'],
   },
 };
 

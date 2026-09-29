@@ -1,0 +1,65 @@
+# V2: Horizontal Pod Autoscaler for backend services
+# 基於 k6 測量數據設定：
+#   - 100 VU → 36% 失敗率，p50 431ms → 2 Pods 是合理下限
+#   - 200 VU → 38% 失敗率 → 3-4 Pods 可能必要
+#   - 本地 Docker Desktop K8s 通常只有 2 CPU + 1.5GB RAM
+#   → 設定 minReplicas=2, maxReplicas=4, CPU 目標 75%
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: manufacturer-agent
+  namespace: thesis
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: manufacturer-agent
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: customer-agent
+  namespace: thesis
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: customer-agent
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: manufacturer-client
+  namespace: thesis
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: manufacturer-client
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75

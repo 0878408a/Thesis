@@ -1,0 +1,15 @@
+# V2: Manufacturer DB 獨立 PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: thesis-manufacturer-mariadb-data
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: manufacturer-mariadb
+    app.kubernetes.io/part-of: thesis
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi

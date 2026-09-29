@@ -1,0 +1,208 @@
+{
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "firmware status 200": {
+                    "name": "firmware status 200",
+                    "path": "::firmware status 200",
+                    "id": "0e57c6e7c60844fad14c90ede2040f8d",
+                    "passes": 498,
+                    "fails": 365
+                },
+                "firmware content-type json": {
+                    "id": "5893fb3e3f2cd2ecbee398d115f99156",
+                    "passes": 498,
+                    "fails": 365,
+                    "name": "firmware content-type json",
+                    "path": "::firmware content-type json"
+                },
+                "firmware valid json": {
+                    "passes": 498,
+                    "fails": 365,
+                    "name": "firmware valid json",
+                    "path": "::firmware valid json",
+                    "id": "0e69dd104cbac7fe78f0cb39f9c7e71d"
+                },
+                "devices status 200": {
+                    "name": "devices status 200",
+                    "path": "::devices status 200",
+                    "id": "91fa2eb8afb3b709b55bb42e80a40b91",
+                    "passes": 331,
+                    "fails": 532
+                },
+                "devices content-type json": {
+                    "path": "::devices content-type json",
+                    "id": "4514f7e78dc33f9eef9498c665ab2d8b",
+                    "passes": 331,
+                    "fails": 532,
+                    "name": "devices content-type json"
+                },
+                "devices valid json": {
+                    "path": "::devices valid json",
+                    "id": "f9d2a81e17d54dc9d6a863659a89ce33",
+                    "passes": 331,
+                    "fails": 532,
+                    "name": "devices valid json"
+                }
+            }
+    },
+    "metrics": {
+        "http_req_connecting": {
+            "max": 126.1829,
+            "p(90)": 21.054650000000002,
+            "p(95)": 49.96045,
+            "avg": 7.490722421784463,
+            "min": 0,
+            "med": 0.61365
+        },
+        "http_req_sending": {
+            "max": 6.2563,
+            "p(90)": 0,
+            "p(95)": 0.301225,
+            "avg": 0.05074588644264195,
+            "min": 0,
+            "med": 0
+        },
+        "firmware_api_duration": {
+            "max": 186.6927,
+            "p(90)": 70.4655,
+            "p(95)": 85.87698999999999,
+            "avg": 32.57291239860953,
+            "min": 0,
+            "med": 36.2024
+        },
+        "firmware_api_errors": {
+            "count": 365,
+            "rate": 4.563449311543034,
+            "thresholds": {
+                "count==0": true
+            }
+        },
+        "vus": {
+            "value": 2,
+            "min": 2,
+            "max": 200
+        },
+        "devices_api_duration": {
+            "avg": 21.304587022016214,
+            "min": 0,
+            "med": 0,
+            "max": 253.7261,
+            "p(90)": 61.44936000000002,
+            "p(95)": 79.28688999999993
+        },
+        "iteration_duration": {
+            "min": 946.9311,
+            "med": 16948.2393,
+            "max": 20333.9097,
+            "p(90)": 20011.800880000003,
+            "p(95)": 20260.08666,
+            "avg": 15874.586089223625
+        },
+        "checks": {
+            "fails": 2691,
+            "passes": 2487,
+            "value": 0.4803012746234067
+        },
+        "data_sent": {
+            "rate": 35327.74905499717,
+            "count": 2825632
+        },
+        "data_received": {
+            "count": 2720857,
+            "rate": 34017.78905056725
+        },
+        "http_req_duration": {
+            "avg": 26.938749710312873,
+            "min": 0,
+            "med": 0,
+            "max": 253.7261,
+            "p(90)": 66.69845000000001,
+            "p(95)": 82.13765000000001
+        },
+        "http_req_blocked": {
+            "p(90)": 8559.35655,
+            "p(95)": 9028.3395,
+            "avg": 2711.7095634994207,
+            "min": 0,
+            "med": 0,
+            "max": 9988.222
+        },
+        "http_req_failed": {
+            "passes": 897,
+            "fails": 829,
+            "value": 0.5196987253765932
+        },
+        "http_req_failed{endpoint:customer_devices}": {
+            "passes": 532,
+            "fails": 331,
+            "thresholds": {
+                "rate<0.05": true
+            },
+            "value": 0.6164542294322132
+        },
+        "http_req_duration{expected_response:true}": {
+            "max": 253.7261,
+            "p(90)": 82.58362000000001,
+            "p(95)": 105.40223999999992,
+            "avg": 56.04749843184561,
+            "min": 21.6034,
+            "med": 49.006
+        },
+        "http_req_waiting": {
+            "max": 252.1618,
+            "p(90)": 65.74475,
+            "p(95)": 81.3181,
+            "avg": 26.576681344148327,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_receiving": {
+            "p(95)": 1.3502,
+            "avg": 0.3113224797219003,
+            "min": 0,
+            "med": 0,
+            "max": 37.7577,
+            "p(90)": 0.56965
+        },
+        "http_reqs": {
+            "count": 1726,
+            "rate": 21.579489073214457
+        },
+        "http_req_tls_handshaking": {
+            "avg": 1999.8873758980317,
+            "min": 0,
+            "med": 0,
+            "max": 9986.6451,
+            "p(90)": 8446.5306,
+            "p(95)": 8970.9269
+        },
+        "iterations": {
+            "count": 863,
+            "rate": 10.789744536607229
+        },
+        "devices_api_errors": {
+            "count": 532,
+            "rate": 6.651383654084642,
+            "thresholds": {
+                "count==0": true
+            }
+        },
+        "http_req_failed{endpoint:customer_firmware}": {
+            "passes": 365,
+            "fails": 498,
+            "thresholds": {
+                "rate<0.05": true
+            },
+            "value": 0.42294322132097334
+        },
+        "vus_max": {
+            "value": 200,
+            "min": 200,
+            "max": 200
+        }
+    }
+}

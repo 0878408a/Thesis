@@ -1,0 +1,15 @@
+# V2: Customer DB 獨立 PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: thesis-customer-mariadb-data
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: customer-mariadb
+    app.kubernetes.io/part-of: thesis
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi

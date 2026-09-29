@@ -1,0 +1,39 @@
+{
+  "target": {
+    "customer_url": "https://localhost:1443",
+    "customer_id": "3e01e6a7-1c25-4a5e-97c5-92ec5abfd10c"
+  },
+  "duration_seconds": 1802.3755051,
+  "per_api": {
+    "customer_firmware": {
+      "endpoint": "GET /api/customer/<id>/firmware",
+      "requests": 8967,
+      "success": 8967,
+      "errors": 0,
+      "error_rate": 0,
+      "rps": 4.98,
+      "p50_ms": 5001.5014,
+      "p95_ms": 7767.675749999999,
+      "p99_ms": null
+    },
+    "customer_devices": {
+      "endpoint": "GET /api/customer/<id>/devices",
+      "requests": 8967,
+      "success": 8967,
+      "errors": 0,
+      "error_rate": 0,
+      "rps": 4.98,
+      "p50_ms": 4893.7464,
+      "p95_ms": 7684.660139999999,
+      "p99_ms": null
+    }
+  },
+  "global": {
+    "total_requests": 17934,
+    "total_non_2xx": 0,
+    "rps": 9.95,
+    "p50_ms": 4952.1941,
+    "p95_ms": 7723.104179999998,
+    "p99_ms": null
+  }
+}

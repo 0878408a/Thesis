@@ -1,0 +1,7 @@
+# V2: 單一 namespace（與 V1 相同）
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: thesis
+  labels:
+    app.kubernetes.io/part-of: thesis

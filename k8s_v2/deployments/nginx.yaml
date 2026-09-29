@@ -1,0 +1,142 @@
+# Step 5-C-9: Nginx Deployment + Service (對外單一入口)
+# ----------------------------------------------------------------------------
+# 保留既有 routing:
+#   443  customer: / → static dist ; /api/ → customer-agent:5001 (TLS)
+#   8443 manufacturer mTLS (ssl_verify_client on)
+#        /manufacturer/agent/   → manufacturer-agent:8000
+#        /manufacturer/client/  → manufacturer-client:5002
+# 設定檔來自 ConfigMap thesis-nginx-conf; 憑證來自 Secret thesis-nginx-certs
+#   (掛至 /etc/nginx/certs/, 與 conf.d 內引用的路徑一致)。
+# frontend dist 由同 pod 的 frontend-sidecar 提供 (見 5-C-10)。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/part-of: thesis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nginx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - name: http
+              containerPort: 80
+            - name: https
+              containerPort: 443
+            - name: mtls
+              containerPort: 8443
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            # conf.d 兩檔: customer.conf / manufacturer.conf
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/customer.conf
+              subPath: customer.conf
+              readOnly: true
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/manufacturer.conf
+              subPath: manufacturer.conf
+              readOnly: true
+            # 憑證 (mTLS + customer TLS), 與 conf.d 引用的 /etc/nginx/certs/ 一致
+            - name: nginx-certs
+              mountPath: /etc/nginx/certs
+              readOnly: true
+            # customer frontend dist (由 frontend-sidecar 提供至共享 emptyDir)
+            - name: customer-html
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+            # manufacturer frontend dist
+            - name: manufacturer-html
+              mountPath: /usr/share/nginx/manufacturer-html
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: 443
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            tcpSocket:
+              port: 443
+            initialDelaySeconds: 15
+            periodSeconds: 15
+
+        # customer-frontend-sidecar: 由 image-baked dist (frontend Dockerfile 多階段建置,
+        # dist 在 image 內 /usr/share/nginx/html) 複製內容至共享 emptyDir customer-html,
+        # nginx 直接以 filesystem 讀取該 emptyDir 作為靜態根; 避免把 dist 放進 ConfigMap (5-C-10)。
+        # 需先建置本地 image: thesis/customer-frontend:local
+        - name: customer-frontend
+          image: thesis/customer-frontend:local
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - >-
+              cp -r /usr/share/nginx/html/. /dest/ &&
+              while :; do sleep 3600; done
+          volumeMounts:
+            - name: customer-html
+              mountPath: /dest
+
+        # manufacturer-frontend-sidecar: 同上, dist 在 image 內 /usr/share/nginx/manufacturer-html。
+        # 需先建置本地 image: thesis/manufacturer-frontend:local
+        - name: manufacturer-frontend
+          image: thesis/manufacturer-frontend:local
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - >-
+              cp -r /usr/share/nginx/manufacturer-html/. /dest/ &&
+              while :; do sleep 3600; done
+          volumeMounts:
+            - name: manufacturer-html
+              mountPath: /dest
+
+      # 共享 emptyDir: nginx 與兩支 frontend sidecar 透過它交換靜態檔
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: thesis-nginx-conf
+        - name: nginx-certs
+          secret:
+            secretName: thesis-nginx-certs
+        - name: customer-html
+          emptyDir: {}
+        - name: manufacturer-html
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/part-of: thesis
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nginx
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: https
+      port: 443
+      targetPort: 443
+    - name: mtls
+      port: 8443
+      targetPort: 8443

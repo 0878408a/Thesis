@@ -79,16 +79,17 @@ def build_upload_payload(firmware_bytes: bytes, firmware_version: str, device_ty
     return payload
 
 
-def upload_with_mtls(payload):
+def upload_with_mtls(payload, timeout: int | float = 10):
     """使用 mTLS 路徑對 Django Upload API 發送目前既有的 payload。"""
     return requests.post(
         UPLOAD_URL,
         json=payload,
         cert=(str(MANUFACTURER_CERT_PATH), str(MANUFACTURER_PRIVATE_KEY_PATH)),
         verify=str(CA_CERT_PATH),
+        timeout=timeout,
     )
 
-def history_with_mtls(page: str = "1"):
+def history_with_mtls(page: str = "1", timeout: int | float = 10):
     """使用 Manufacturer Client 的 mTLS 憑證取得 Firmware History。"""
 
     return requests.get(
@@ -99,6 +100,7 @@ def history_with_mtls(page: str = "1"):
             str(MANUFACTURER_PRIVATE_KEY_PATH),
         ),
         verify=str(CA_CERT_PATH),
+        timeout=timeout,
     )
 
 def main():

@@ -64,8 +64,10 @@ class FirmwareMetadata(models.Model):
     )
 
     device_type = models.CharField(max_length=100)
-    firmware_version = models.CharField(max_length=50, unique=True)
+    # V2: unique per (manufacturer, device_type, firmware_version) — not global
+    firmware_version = models.CharField(max_length=50)
     firmware_data = models.BinaryField()
     class Meta:
         db_table = 'firmwaremetadata'
         managed = False
+        unique_together = (('manufacturer_id', 'device_type', 'firmware_version'),)

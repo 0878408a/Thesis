@@ -135,21 +135,7 @@ jobs:
         run: npm run build
 
   # ----------------------------------------------------------------
-  # 6) Docker images build (驗證 Dockerfile 語法/指令正確)
-  # ----------------------------------------------------------------
-  docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build customer-agent image
-        run: docker build -f Dockerfile.customer-agent -t thesis/customer-agent .
-      - name: Build manufacturer-client image
-        run: docker build -f Dockerfile.manufacturer-client -t thesis/manufacturer-client .
-      - name: Build manufacturer-agent image
-        run: docker build -f Dockerfile.manufacturer-agent -t thesis/manufacturer-agent .
-
-  # ----------------------------------------------------------------
-  # 7) Nginx + compose 結構驗證 (語法檢查, 不需實際起 container)
+  # 6) Nginx + compose 結構驗證 (語法檢查, 不需實際起 container)
   # ----------------------------------------------------------------
   nginx-validate:
     runs-on: ubuntu-latest
@@ -161,3 +147,110 @@ jobs:
         run: |
           docker run --rm -v "$PWD/nginx/nginx.conf":/etc/nginx/nginx.conf:ro \
             nginx:1.27-alpine nginx -t -c /etc/nginx/nginx.conf
+
+  # ----------------------------------------------------------------
+  # 7) Docker images build & GHCR push (涵蓋全部 5 個 services)
+  # ----------------------------------------------------------------
+  docker-build-push:
+    runs-on: ubuntu-latest
+    needs:
+      - customer-agent-tests
+      - manufacturer-client-tests
+      - manufacturer-agent-tests
+      - customer-frontend
+      - manufacturer-frontend
+      - nginx-validate
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and tag Docker images
+        env:
+          OWNER: ${{ github.repository_owner }}
+          SHA: ${{ github.sha }}
+          IS_MAIN_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          OWNER_LC=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          PREFIX="ghcr.io/${OWNER_LC}/thesis"
+          SHORT_SHA="${SHA:0:7}"
+
+          echo "Building with image prefix: ${PREFIX}, tag: ${SHORT_SHA}"
+
+          # 1) Customer Agent
+          docker build -f Dockerfile.customer-agent \
+            -t thesis/customer-agent:local \
+            -t "${PREFIX}-customer-agent:${SHORT_SHA}" \
+            -t "${PREFIX}-customer-agent:latest" .
+
+          # 2) Manufacturer Agent
+          docker build -f Dockerfile.manufacturer-agent \
+            -t thesis/manufacturer-agent:local \
+            -t "${PREFIX}-manufacturer-agent:${SHORT_SHA}" \
+            -t "${PREFIX}-manufacturer-agent:latest" .
+
+          # 3) Manufacturer Client
+          docker build -f Dockerfile.manufacturer-client \
+            -t thesis/manufacturer-client:local \
+            -t "${PREFIX}-manufacturer-client:${SHORT_SHA}" \
+            -t "${PREFIX}-manufacturer-client:latest" .
+
+          # 4) Customer Frontend
+          docker build -f thesis/customer_agent/frontend/customer/Dockerfile \
+            -t thesis/customer-frontend:local \
+            -t "${PREFIX}-customer-frontend:${SHORT_SHA}" \
+            -t "${PREFIX}-customer-frontend:latest" \
+            thesis/customer_agent/frontend/customer
+
+          # 5) Manufacturer Frontend
+          docker build -f thesis/manufacturer_client/frontend/manufacturer/Dockerfile \
+            -t thesis/manufacturer-frontend:local \
+            -t "${PREFIX}-manufacturer-frontend:${SHORT_SHA}" \
+            -t "${PREFIX}-manufacturer-frontend:latest" \
+            thesis/manufacturer_client/frontend/manufacturer
+
+          # Push to GHCR on main push
+          if [ "$IS_MAIN_PUSH" = "true" ]; then
+            echo "Pushing images to GHCR..."
+            for svc in customer-agent manufacturer-agent manufacturer-client customer-frontend manufacturer-frontend; do
+              docker push "${PREFIX}-${svc}:${SHORT_SHA}"
+              docker push "${PREFIX}-${svc}:latest"
+            done
+          else
+            echo "Non-main push or PR build: images built and verified, skipping push."
+          fi
+
+  # ----------------------------------------------------------------
+  # 8) Kubernetes Deployment Manifests Validation (CD pre-flight)
+  # ----------------------------------------------------------------
+  k8s-manifest-validate:
+    runs-on: ubuntu-latest
+    needs: [docker-build-push]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Kubernetes Manifests Syntax (dry-run)
+        run: |
+          kubectl apply --dry-run=client \
+            -f k8s/namespace.yaml \
+            -f k8s/pvc/ \
+            -f k8s/configmaps/ \
+            -f k8s/deployments/ \
+            -f k8s/jobs/
+      - name: Report CD Status
+        run: |
+          echo "### Kubernetes CD Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Manifests Validation**: PASS (dry-run verified)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Remote Kubernetes Deployment**: NOT CONFIGURED" >> $GITHUB_STEP_SUMMARY
+          echo "  - Reason: Current cluster is local Docker Desktop Kubernetes; no remote cluster credentials configured." >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,108 @@
+# V2: Manufacturer Agent (Django) Deployment + Service
+# - replicas: 2（multi-Pod）
+# - DB_HOST → manufacturer-mariadb（獨立 DB Pod）
+# - IOTA env vars（bounded retry 由程式碼內 env 讀取，K8s 不需额外設定）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manufacturer-agent
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: manufacturer-agent
+    app.kubernetes.io/part-of: thesis
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: manufacturer-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: manufacturer-agent
+    spec:
+      containers:
+        - name: manufacturer-agent
+          image: thesis/manufacturer-agent:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_ENGINE
+              value: django.db.backends.mysql
+            - name: DB_HOST
+              value: manufacturer-mariadb
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_USER
+              value: root
+            - name: DB_NAME
+              value: mydatabase
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: thesis-db-creds
+                  key: DB_PASSWORD
+            - name: DB_INIT_COMMAND
+              value: "SET sql_mode='STRICT_TRANS_TABLES'"
+            - name: DB_CHARSET
+              value: utf8mb4
+            - name: DJANGO_ALLOWED_HOSTS
+              value: "manufacturer-agent"
+            - name: DJANGO_DEBUG
+              value: "True"
+            - name: DJANGO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thesis-manufacturer-agent-secrets
+                  key: DJANGO_SECRET_KEY
+            - name: IOTA_NETWORK
+              value: "testnet"
+            - name: PACKAGE_ID
+              value: "0x08e70252b9d1ecd72456899d02450fd2f76cba1993b6d291d7c7094681a96933"
+            - name: MOVE_MODULE
+              value: "firmware_module"
+            - name: MOVE_FUNCTION
+              value: "publish"
+            - name: IOTA_PRIVATE_KEY_BASE64
+              valueFrom:
+                secretKeyRef:
+                  name: thesis-manufacturer-agent-secrets
+                  key: IOTA_PRIVATE_KEY_BASE64
+            - name: CERT_DIR
+              value: /certs
+          ports:
+            - name: http
+              containerPort: 8000
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 40
+            periodSeconds: 15
+      volumes:
+        - name: certs
+          secret:
+            secretName: thesis-manufacturer-agent-certs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: manufacturer-agent
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: manufacturer-agent
+    app.kubernetes.io/part-of: thesis
+spec:
+  selector:
+    app.kubernetes.io/name: manufacturer-agent
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

@@ -1,0 +1,160 @@
+# V2: Split Seed Job — 分別 seed manufacturer-mariadb (mydatabase) 和 customer-mariadb (customer_database)
+# ----------------------------------------------------------------------------
+# V1: 單一 mariadb Pod 上 seed 兩個 DB
+# V2: 兩個獨立 mariadb Pod，seed 各自執行
+#
+# 此 Job 同時等待兩個 DB 都 ready 後，依序 seed：
+#   1. manufacturer-mariadb → mydatabase (manufacturer, device, customer, firmwaremetadata, submit_block_record)
+#   2. customer-mariadb → customer_database (manufacturer, device, customer, firmwaremetadata, customer_device)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: thesis-v2-db-seed
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: v2-db-seed
+    app.kubernetes.io/part-of: thesis
+spec:
+  backoffLimit: 4
+  template:
+    spec:
+      restartPolicy: Never
+      # 等待兩個 DB 都真正 ready 才執行 seed
+      initContainers:
+        - name: wait-for-manufacturer-db
+          image: mariadb:11
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for manufacturer-mariadb:3306..."
+              until mariadb-admin ping -h manufacturer-mariadb -P 3306 --silent 2>/dev/null; do
+                echo "  manufacturer-mariadb not ready, retrying in 3s"
+                sleep 3
+              done
+              echo "manufacturer-mariadb is accepting connections"
+        - name: wait-for-customer-db
+          image: mariadb:11
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for customer-mariadb:3306..."
+              until mariadb-admin ping -h customer-mariadb -P 3306 --silent 2>/dev/null; do
+                echo "  customer-mariadb not ready, retrying in 3s"
+                sleep 3
+              done
+              echo "customer-mariadb is accepting connections"
+      containers:
+        - name: seed
+          image: python:3.10-slim
+          command:
+            - sh
+            - -c
+          args:
+            - |
+              set -e
+              echo "Installing pymysql..."
+              pip install --no-cache-dir pymysql
+              echo "=== Seeding manufacturer-mariadb (mydatabase) ==="
+              export DB_HOST=manufacturer-mariadb
+              python /seed/run_manufacturer_seed.py
+              echo "=== Seeding customer-mariadb (customer_database) ==="
+              export DB_HOST=customer-mariadb
+              python /seed/run_customer_seed.py
+              echo "ALL V2 SEEDS DONE"
+          env:
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_INIT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: thesis-db-creds
+                  key: DB_INIT_PASSWORD
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: thesis-db-creds
+                  key: MYSQL_ROOT_PASSWORD
+          volumeMounts:
+            - name: seed-scripts
+              mountPath: /seed
+              readOnly: true
+            # manufacturer SQL files
+            - name: sql-manufacturer
+              mountPath: /sql/manufacturer_agent_db/manufacturer.sql
+              subPath: manuf_manufacturer.sql
+              readOnly: true
+            - name: sql-manufacturer-device
+              mountPath: /sql/manufacturer_agent_db/device.sql
+              subPath: manuf_device.sql
+              readOnly: true
+            - name: sql-manufacturer-customer
+              mountPath: /sql/manufacturer_agent_db/customer.sql
+              subPath: manuf_customer.sql
+              readOnly: true
+            - name: sql-manufacturer-firmwaremetadata
+              mountPath: /sql/manufacturer_agent_db/firmwaremetadata.sql
+              subPath: manuf_firmwaremetadata.sql
+              readOnly: true
+            - name: sql-manufacturer-submit
+              mountPath: /sql/manufacturer_agent_db/submit_block_record.sql
+              subPath: manuf_submit_block_record.sql
+              readOnly: true
+            # customer SQL files
+            - name: sql-customer-manufacturer
+              mountPath: /sql/customer_agent_db/manufacturer.sql
+              subPath: customer_manufacturer.sql
+              readOnly: true
+            - name: sql-customer-device
+              mountPath: /sql/customer_agent_db/device.sql
+              subPath: customer_device.sql
+              readOnly: true
+            - name: sql-customer-customer
+              mountPath: /sql/customer_agent_db/customer.sql
+              subPath: customer_customer.sql
+              readOnly: true
+            - name: sql-customer-firmwaremetadata
+              mountPath: /sql/customer_agent_db/firmwaremetadata.sql
+              subPath: customer_firmwaremetadata.sql
+              readOnly: true
+            - name: sql-customer-customer-device
+              mountPath: /sql/customer_agent_db/customer_device.sql
+              subPath: customer_customer_device.sql
+              readOnly: true
+      volumes:
+        - name: seed-scripts
+          configMap:
+            name: thesis-v2-seed-scripts
+        - name: sql-manufacturer
+          configMap:
+            name: thesis-db-sql-files
+        - name: sql-manufacturer-device
+          configMap:
+            name: thesis-db-sql-files
+        - name: sql-manufacturer-customer
+          configMap:
+            name: thesis-db-sql-files
+        - name: sql-manufacturer-firmwaremetadata
+          configMap:
+            name: thesis-db-sql-files
+        - name: sql-manufacturer-submit
+          configMap:
+            name: thesis-db-sql-files
+        - name: sql-customer-manufacturer
+          configMap:
+            name: thesis-db-sql-files
+        - name: sql-customer-device
+          configMap:
+            name: thesis-db-sql-files
+        - name: sql-customer-customer
+          configMap:
+            name: thesis-db-sql-files
+        - name: sql-customer-firmwaremetadata
+          configMap:
+            name: thesis-db-sql-files
+        - name: sql-customer-customer-device
+          configMap:
+            name: thesis-db-sql-files

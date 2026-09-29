@@ -1,0 +1,92 @@
+# V2: Customer Agent (Flask) Deployment + Service
+# - replicas: 2（multi-Pod）
+# - DB_HOST → customer-mariadb（獨立 DB Pod）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customer-agent
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: customer-agent
+    app.kubernetes.io/part-of: thesis
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: customer-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: customer-agent
+    spec:
+      containers:
+        - name: customer-agent
+          image: thesis/customer-agent:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CUSTOMER_AGENT_PUBLIC_PORT
+              value: "5001"
+            - name: CUSTOMER_AGENT_DEVICE_PORT
+              value: "5000"
+            - name: CUSTOMER_AGENT_ENABLE_MDNS
+              value: "0"
+            - name: CUSTOMER_AGENT_ENABLE_PERIODIC_QUERY
+              value: "1"
+            - name: DB_HOST
+              value: customer-mariadb
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_USER
+              value: root
+            - name: DB_NAME
+              value: customer_database
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: thesis-db-creds
+                  key: DB_PASSWORD
+            - name: CERT_DIR
+              value: /certs
+          ports:
+            - name: public
+              containerPort: 5001
+            - name: device
+              containerPort: 5000
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: 5001
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            tcpSocket:
+              port: 5001
+            initialDelaySeconds: 30
+            periodSeconds: 15
+      volumes:
+        - name: certs
+          secret:
+            secretName: thesis-customer-agent-certs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customer-agent
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: customer-agent
+    app.kubernetes.io/part-of: thesis
+spec:
+  selector:
+    app.kubernetes.io/name: customer-agent
+  ports:
+    - name: public
+      port: 5001
+      targetPort: 5001
+    - name: device
+      port: 5000
+      targetPort: 5000

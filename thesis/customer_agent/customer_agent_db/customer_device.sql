@@ -32,9 +32,9 @@ CREATE TABLE IF NOT EXISTS `customer_device` (
   PRIMARY KEY (`id`),
   KEY `FK_device_owner_customer_record` (`customer_id`),
   KEY `manufacturer_id_device_type` (`manufacturer_id`,`device_type`),
-  KEY `FK_customer_device_firmwaremetadata` (`firmware_version`),
+  KEY `FK_customer_device_firmwaremetadata` (`manufacturer_id`,`device_type`,`firmware_version`),
   CONSTRAINT `FK_customer_device_device` FOREIGN KEY (`manufacturer_id`, `device_type`) REFERENCES `device` (`manufacturer_id`, `device_type`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT `FK_customer_device_firmwaremetadata` FOREIGN KEY (`firmware_version`) REFERENCES `firmwaremetadata` (`firmware_version`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `FK_customer_device_firmwaremetadata` FOREIGN KEY (`manufacturer_id`, `device_type`, `firmware_version`) REFERENCES `firmwaremetadata` (`manufacturer_id`, `device_type`, `firmware_version`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `FK_device_owner_customer_record` FOREIGN KEY (`customer_id`) REFERENCES `customer` (`customer_id`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

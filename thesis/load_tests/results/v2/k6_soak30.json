@@ -1,0 +1,43 @@
+{
+  "version": "V2",
+  "test": "soak30",
+  "vus": 50,
+  "duration": "30m",
+  "total_iterations": 8206,
+  "total_http_requests": 16412,
+  "firmware_api": {
+    "requests": 8206,
+    "success_2xx": 6515,
+    "failed_or_timeout": 1691,
+    "fail_rate": "20.6%",
+    "p50_ms": 67.7,
+    "p95_ms": 233.2,
+    "rps": 4.51
+  },
+  "devices_api": {
+    "requests": 8206,
+    "success_2xx": 6430,
+    "failed_or_timeout": 1776,
+    "fail_rate": "21.6%",
+    "p50_ms": 66.2,
+    "p95_ms": 229.8,
+    "rps": 4.51
+  },
+  "overall": {
+    "total_requests": 16412,
+    "total_success": 12945,
+    "total_failed": 3467,
+    "overall_fail_rate": "21.1%",
+    "p50_ms": 67.0,
+    "p95_ms": 231.1,
+    "rps": 9.02,
+    "threshold_crossed": true,
+    "result": "FAILED"
+  },
+  "notes": "大量 timeout 自 ~4min 持續至 30min，原因為 customer-agent Flask single-threaded server 與 run_periodic_query 執行緒（每 3s 對 IOTA testnet API 發起外部請求）競爭 GIL + Docker Desktop port-forward 過載（大量 TIME_WAIT）。V1 soak 同樣 FAILED（0.89% fail 但 threshold 更嚴格）。IOTA testnet API 回應慢（~2.35s）放大問題。",
+  "v1_baseline_for_comparison": {
+    "soak30_fail_rate": "0.89%",
+    "soak30_result": "FAILED",
+    "note": "V1 soak 同樣 FAILED，但 V2 21.1% timeout 率高於 V1 0.89%。可能原因：V2 兩個 customer-agent Pod 都執行 run_periodic_query（V1 也是），但 port-forward 持續 30min 累積更多 TIME_WAIT。"
+  }
+}

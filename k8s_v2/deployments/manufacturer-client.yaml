@@ -1,0 +1,69 @@
+# V2: Manufacturer Client (Flask internal) Deployment + Service
+# - replicas: 2（multi-Pod）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manufacturer-client
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: manufacturer-client
+    app.kubernetes.io/part-of: thesis
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: manufacturer-client
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: manufacturer-client
+    spec:
+      containers:
+        - name: manufacturer-client
+          image: thesis/manufacturer-client:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: UPLOAD_URL
+              value: "https://nginx:8443/manufacturer/agent/upload_firmware/upload/"
+            - name: HISTORY_URL
+              value: "https://nginx:8443/manufacturer/agent/upload_firmware/history/"
+            - name: CERT_DIR
+              value: /certs
+          ports:
+            - name: http
+              containerPort: 5002
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: 5002
+            initialDelaySeconds: 8
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            tcpSocket:
+              port: 5002
+            initialDelaySeconds: 25
+            periodSeconds: 15
+      volumes:
+        - name: certs
+          secret:
+            secretName: thesis-manufacturer-client-certs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: manufacturer-client
+  namespace: thesis
+  labels:
+    app.kubernetes.io/name: manufacturer-client
+    app.kubernetes.io/part-of: thesis
+spec:
+  selector:
+    app.kubernetes.io/name: manufacturer-client
+  ports:
+    - name: http
+      port: 5002
+      targetPort: 5002
