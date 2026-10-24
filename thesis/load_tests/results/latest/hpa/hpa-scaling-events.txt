@@ -1,0 +1,15 @@
+52m         Normal    ScalingReplicaSet              deployment/manufacturer-agent                     Scaled down replica set manufacturer-agent-66d48b5688 from 3 to 2
+52m         Normal    SuccessfulRescale              horizontalpodautoscaler/manufacturer-agent-demo   New size: 2; reason: All metrics below target
+51m         Normal    ScalingReplicaSet              deployment/manufacturer-agent                     Scaled down replica set manufacturer-agent-66d48b5688 from 2 to 1
+14m         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/manufacturer-agent-demo   invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+14m         Warning   FailedGetResourceMetric        horizontalpodautoscaler/manufacturer-agent-demo   failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+13m         Warning   FailedGetResourceMetric        horizontalpodautoscaler/customer-agent            failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+13m         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/customer-agent            invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+13m         Warning   FailedGetResourceMetric        horizontalpodautoscaler/manufacturer-client       failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+13m         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/manufacturer-client       invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+8m19s       Normal    ScalingReplicaSet              deployment/manufacturer-agent                     Scaled up replica set manufacturer-agent-66d48b5688 from 1 to 2
+8m19s       Normal    SuccessfulRescale              horizontalpodautoscaler/manufacturer-agent-demo   New size: 2; reason: cpu resource utilization (percentage of request) above target
+6m17s       Normal    ScalingReplicaSet              deployment/manufacturer-agent                     Scaled up replica set manufacturer-agent-66d48b5688 from 2 to 3
+6m17s       Normal    SuccessfulRescale              horizontalpodautoscaler/manufacturer-agent-demo   New size: 3; reason: cpu resource utilization (percentage of request) above target
+14s         Normal    SuccessfulRescale              horizontalpodautoscaler/manufacturer-agent-demo   New size: 1; reason: All metrics below target
+14s         Normal    ScalingReplicaSet              deployment/manufacturer-agent                     Scaled down replica set manufacturer-agent-66d48b5688 from 3 to 1

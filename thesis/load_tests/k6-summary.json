@@ -1,0 +1,39 @@
+{
+  "target": {
+    "customer_url": "https://127.0.0.1:18443",
+    "customer_id": "3e01e6a7-1c25-4a5e-97c5-92ec5abfd10c"
+  },
+  "duration_seconds": 1803.7404042,
+  "per_api": {
+    "customer_firmware": {
+      "endpoint": "GET /api/customer/<id>/firmware",
+      "requests": 16847,
+      "success": 16847,
+      "errors": 0,
+      "error_rate": 0,
+      "rps": 9.34,
+      "p50_ms": 2276.3751,
+      "p95_ms": 5869.3720299999995,
+      "p99_ms": null
+    },
+    "customer_devices": {
+      "endpoint": "GET /api/customer/<id>/devices",
+      "requests": 16847,
+      "success": 16847,
+      "errors": 0,
+      "error_rate": 0,
+      "rps": 9.34,
+      "p50_ms": 2266.7795,
+      "p95_ms": 5896.756879999998,
+      "p99_ms": null
+    }
+  },
+  "global": {
+    "total_requests": 33694,
+    "total_non_2xx": 0,
+    "rps": 18.68,
+    "p50_ms": 2270.4097,
+    "p95_ms": 5890.0593249999965,
+    "p99_ms": null
+  }
+}

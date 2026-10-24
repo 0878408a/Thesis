@@ -1,0 +1,12 @@
+﻿Manufacturer Agent mTLS history load summary
+requests=3681
+rps=30.20
+http_req_failed=0.00% (0/3681)
+status_2xx=3681
+status_4xx=0
+status_5xx=0
+status_other=0
+invalid_bodies=0
+checks_passed=7362
+checks_failed=0
+duration_ms min=34.600613 p50=1351.71419 p90=2671.971967 p95=3183.573212 p99=7665.663966199999 max=8728.953506

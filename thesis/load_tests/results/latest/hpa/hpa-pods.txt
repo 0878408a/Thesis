@@ -1,0 +1,4 @@
+NAME                                  READY   STATUS        RESTARTS       AGE     IP           NODE             NOMINATED NODE   READINESS GATES
+manufacturer-agent-66d48b5688-4jkwx   1/1     Terminating   0              6m13s   10.1.0.167   docker-desktop   <none>           <none>
+manufacturer-agent-66d48b5688-db8fr   1/1     Running       2 (179m ago)   5h19m   10.1.0.149   docker-desktop   <none>           <none>
+manufacturer-agent-66d48b5688-s6567   1/1     Terminating   0              8m15s   10.1.0.166   docker-desktop   <none>           <none>

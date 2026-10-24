@@ -1,0 +1,4 @@
+NAME                                  CPU(cores)   MEMORY(bytes)   
+manufacturer-agent-66d48b5688-4jkwx   1m           67Mi            
+manufacturer-agent-66d48b5688-db8fr   2m           101Mi           
+manufacturer-agent-66d48b5688-s6567   2m           90Mi            
